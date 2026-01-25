@@ -1,0 +1,18 @@
+{
+  "schema_version": "1.0",
+  "currency": "EUR",
+  "assumptions": {
+    "acquisition_per_policy": 72.5,
+    "maintenance_per_policy": 20.45,
+    "commission_first_year_rate": 0.5,
+    "commission_renewal_rate": 0.1,
+    "claim_handling_per_claim": 24.54
+  },
+  "interpretation": {
+    "acquisition_per_policy": "Jednorazový akvizičný náklad na jednu zmluvu (napr. administratíva, underwriting, vystavenie zmluvy).",
+    "maintenance_per_policy": "Ročný udržiavací náklad na jednu aktívnu zmluvu (napr. správa zmluvy, komunikácia, inkaso).",
+    "commission_first_year_rate": "Provízia v 1. roku ako podiel z inkasovaného poistného (0.50 = 50%).",
+    "commission_renewal_rate": "Udržiavacia provízia v ďalších rokoch ako podiel z inkasovaného poistného (0.10 = 10%).",
+    "claim_handling_per_claim": "Náklad na likvidáciu jednej poistnej udalosti (napr. úmrtie) – fixná suma na prípad."
+  }
+}

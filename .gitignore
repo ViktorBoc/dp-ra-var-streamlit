@@ -1,0 +1,30 @@
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*.pyd
+*.so
+*.egg-info/
+dist/
+build/
+
+# ---- Virtual env ----
+.venv/
+venv/
+
+# ---- IDE ----
+.idea/
+*.iml
+
+# ---- OS ----
+.DS_Store
+Thumbs.db
+
+# ---- Streamlit ----
+.streamlit/
+
+# ---- Local outputs / logs ----
+outputs/
+*.log
+
+# ---- Notebooks / temp ----
+.ipynb_checkpoints/

@@ -1,0 +1,139 @@
+{
+  "schema_version": "1.0",
+  "base_confidence": 0.995,
+  "percentiles": [
+    0.5,
+    0.55,
+    0.6,
+    0.65,
+    0.7,
+    0.75,
+    0.8,
+    0.85,
+    0.9,
+    0.95,
+    0.995
+  ],
+  "scaling": {
+    "method": "normal_quantile_linear",
+    "formula_multiplier": "shock(p) = 1 + (shock_0.995 - 1) * (z_p / z_0.995)",
+    "formula_additive": "delta(p) = delta_0.995 * (z_p / z_0.995)"
+  },
+  "product_types_in_dummy_data": [
+    "term_insurance",
+    "endowment",
+    "UL_endowment",
+    "annuity",
+    "whole_of_life"
+  ],
+  "risks": {
+    "mortality": {
+      "slovak_name": "Riziko úmrtnosti",
+      "type": "multiplier",
+      "parameter": "qx",
+      "shock_0.995": 1.15,
+      "direction": "up",
+      "applies_to": [
+        "term_insurance",
+        "endowment",
+        "UL_endowment",
+        "whole_of_life"
+      ]
+    },
+    "longevity": {
+      "slovak_name": "Riziko dlhovekosti",
+      "type": "multiplier",
+      "parameter": "qx",
+      "shock_0.995": 0.8,
+      "direction": "down",
+      "applies_to": [
+        "annuity",
+        "endowment",
+        "UL_endowment"
+      ]
+    },
+    "lapse_up": {
+      "slovak_name": "Riziko storna – trvalý nárast",
+      "type": "multiplier",
+      "parameter": "lapse_rate",
+      "shock_0.995": 1.5,
+      "direction": "up",
+      "cap": {
+        "min": 0.0,
+        "max": 1.0
+      },
+      "applies_to": [
+        "term_insurance",
+        "endowment",
+        "UL_endowment",
+        "annuity",
+        "whole_of_life"
+      ]
+    },
+    "lapse_down": {
+      "slovak_name": "Riziko storna – trvalý pokles",
+      "type": "multiplier_with_absolute_cap",
+      "parameter": "lapse_rate",
+      "shock_0.995": 0.5,
+      "direction": "down",
+      "cap": {
+        "min": 0.0,
+        "max": 1.0
+      },
+      "absolute_decrease_cap": 0.2,
+      "applies_to": [
+        "term_insurance",
+        "endowment",
+        "UL_endowment",
+        "annuity",
+        "whole_of_life"
+      ]
+    },
+    "mass_lapse": {
+      "slovak_name": "Riziko storna – hromadné storno",
+      "type": "instant_proportion",
+      "parameter": "mass_lapse_rate",
+      "shock_0.995": 0.4,
+      "direction": "mass",
+      "cap": {
+        "min": 0.0,
+        "max": 1.0
+      },
+      "applies_to": [
+        "term_insurance",
+        "endowment",
+        "UL_endowment",
+        "annuity",
+        "whole_of_life"
+      ]
+    },
+    "expense_level": {
+      "slovak_name": "Riziko nákladov – úroveň nákladov",
+      "type": "multiplier",
+      "parameter": "expenses",
+      "shock_0.995": 1.1,
+      "direction": "up",
+      "applies_to": [
+        "term_insurance",
+        "endowment",
+        "UL_endowment",
+        "annuity",
+        "whole_of_life"
+      ]
+    },
+    "expense_inflation": {
+      "slovak_name": "Riziko nákladov – inflácia nákladov",
+      "type": "additive",
+      "parameter": "expense_inflation_rate",
+      "shock_0.995": 0.01,
+      "direction": "up",
+      "applies_to": [
+        "term_insurance",
+        "endowment",
+        "UL_endowment",
+        "annuity",
+        "whole_of_life"
+      ]
+    }
+  }
+}

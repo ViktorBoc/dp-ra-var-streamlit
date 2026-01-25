@@ -1,0 +1,9 @@
+schema_version: "1.0"
+base_confidence: 0.995
+method: normal_quantile_ratio
+z_distribution: standard_normal
+rounding_decimals: 6
+multiplier:
+  formula: "shock_p = 1 + (shock_0995 - 1) * (z(p)/z(0.995))"
+additive:
+  formula: "delta_p = delta_0995 * (z(p)/z(0.995))"

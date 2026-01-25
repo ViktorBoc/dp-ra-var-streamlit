@@ -1,0 +1,5 @@
+﻿,mortality,longevity,lapse,expense
+mortality,1.0,-0.25,0.0,0.25
+longevity,-0.25,1.0,0.25,0.25
+lapse,0.0,0.25,1.0,0.5
+expense,0.25,0.25,0.5,1.0
