@@ -1,33 +1,26 @@
 schema_version: '1.0'
 products:
   term_insurance:
-    sk_name: Rizikové životné poistenie (na úmrtie)
+    sk_name: Rizikové životné poistenie
     components:
     - mortality
     - lapse
     - expense
   whole_of_life:
-    sk_name: Doživotné životné poistenie
+    sk_name: Trvalé životné poistenie
     components:
     - mortality
     - lapse
     - expense
   endowment:
-    sk_name: Kapitálové životné poistenie (dožitie/úmrtie)
-    components:
-    - mortality
-    - longevity
-    - lapse
-    - expense
-  UL_endowment:
-    sk_name: Investičné životné poistenie (unit-linked)
+    sk_name: Kapitálové životné poistenie
     components:
     - mortality
     - longevity
     - lapse
     - expense
   annuity:
-    sk_name: Dôchodkové poistenie (renta/anuita)
+    sk_name: Dôchodkové poistenie
     components:
     - longevity
     - lapse

@@ -1,18 +1,38 @@
 {
-  "schema_version": "1.0",
+  "schema_version": "2.0",
   "currency": "EUR",
-  "assumptions": {
-    "acquisition_per_policy": 72.5,
-    "maintenance_per_policy": 20.45,
-    "commission_first_year_rate": 0.5,
-    "commission_renewal_rate": 0.1,
-    "claim_handling_per_claim": 24.54
+  "common": {
+    "acquisition_rate": 0.01,
+    "maintenance_per_policy": 25.0
+  },
+  "by_product": {
+    "term_insurance": {
+      "commission_first_year_rate": 0.50,
+      "commission_renewal_rate": 0.10,
+      "claim_handling_per_claim": 30.0
+    },
+    "whole_of_life": {
+      "commission_first_year_rate": 0.50,
+      "commission_renewal_rate": 0.10,
+      "claim_handling_per_claim": 30.0
+    },
+    "endowment": {
+      "commission_first_year_rate": 0.50,
+      "commission_renewal_rate": 0.10,
+      "claim_handling_per_claim": 30.0
+    },
+    "annuity": {
+      "commission_first_year_rate": 0.003,
+      "commission_renewal_rate": 0.0,
+      "claim_handling_rate": 0.002
+    }
   },
   "interpretation": {
-    "acquisition_per_policy": "Jednorazový akvizičný náklad na jednu zmluvu (napr. administratíva, underwriting, vystavenie zmluvy).",
-    "maintenance_per_policy": "Ročný udržiavací náklad na jednu aktívnu zmluvu (napr. správa zmluvy, komunikácia, inkaso).",
-    "commission_first_year_rate": "Provízia v 1. roku ako podiel z inkasovaného poistného (0.50 = 50%).",
-    "commission_renewal_rate": "Udržiavacia provízia v ďalších rokoch ako podiel z inkasovaného poistného (0.10 = 10%).",
-    "claim_handling_per_claim": "Náklad na likvidáciu jednej poistnej udalosti (napr. úmrtie) – fixná suma na prípad."
+    "acquisition_rate": "Počiatočné/akvizičné náklady ako podiel z poistnej sumy (0.01 = 1%). Jednorazový náklad pri uzatvorení zmluvy.",
+    "maintenance_per_policy": "Ročné správne náklady na jednu aktívnu zmluvu v EUR. Podliehajú inflácii.",
+    "commission_first_year_rate": "Provízia v 1. roku ako podiel z poistného (0.50 = 50%). Pre annuity ako podiel z ročného dôchodku.",
+    "commission_renewal_rate": "Udržiavacia provízia v ďalších rokoch ako podiel z poistného (0.10 = 10%).",
+    "claim_handling_per_claim": "Náklady na likvidáciu jednej poistnej udalosti (úmrtie/dožitie) – fixná suma v EUR.",
+    "claim_handling_rate": "Náklady na výplatu dôchodku ako podiel z ročného dôchodku (0.002 = 0.2%). Používa sa len pre annuity."
   }
 }

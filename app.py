@@ -24,7 +24,7 @@ from src.utils import (
 
 # ---------- Helpers ----------
 
-DEFAULT_PREMIUM_RATE_IF_MISSING = 0.02  # 2% of sum_insured (MVP default)
+DEFAULT_PREMIUM_RATE_IF_MISSING = 0.02  # 2% of sum_insured
 
 
 def _standardize_portfolio(df: pd.DataFrame) -> pd.DataFrame:
@@ -130,7 +130,7 @@ def _build_assumptions(raw: Dict) -> Assumptions:
     idx_base = idx_base[:50]
     idx_st = idx_st[:50]
 
-    exp = raw["expenses"].get("assumptions", raw["expenses"])
+    exp = raw["expenses"]
     return Assumptions(
         mortality_qx_by_age=mort_map,
         lapse_by_product_duration=lapse_by_prod,
@@ -139,13 +139,6 @@ def _build_assumptions(raw: Dict) -> Assumptions:
         index_stressed=idx_st,
         expenses=exp,
     )
-
-
-def _ensure_outputs_dir() -> Path:
-    root = Path(__file__).resolve().parent
-    out_dir = root / "outputs"
-    out_dir.mkdir(parents=True, exist_ok=True)
-    return out_dir
 
 
 @st.cache_data(show_spinner=False)
@@ -166,31 +159,64 @@ def _load_and_prepare():
 
 # ---------- UI ----------
 
-st.set_page_config(page_title="RA (VaR) – Life Insurance", layout="wide")
-st.title("Risk Adjustment (VaR) – Life Insurance")
+st.set_page_config(page_title="RA (VaR) – Životné poistenie", layout="wide")
+st.markdown("""
+<style>
+    [data-testid="stSidebar"] {
+        min-width: 380px;
+        max-width: 380px;
+    }
+    [data-testid="stSidebar"] .stSelectbox > div > div {
+        white-space: normal !important;
+        overflow: visible !important;
+        height: auto !important;
+    }
+</style>
+""", unsafe_allow_html=True)
+st.title("Riziková úprava (VaR) – Životné poistenie")
+
+with st.expander("ℹ️ Vysvetlivky skratiek"):
+    st.markdown("""
+    - **RA** (Risk Adjustment / Riziková úprava) – prirážka k záväzkom za neistotu v odhadoch budúcich peňažných tokov
+    - **BEL** (Best Estimate Liability / Najlepší odhad záväzkov) – súčasná hodnota očakávaných budúcich výplat mínus príjmy z poistného
+    - **NFR** (Non-Financial Risk / Nefinančné riziko) – rizikový kapitál pre jednotlivé rizikové komponenty (mortalita, storno, náklady, dlhovekosť)
+    - **VaR** (Value at Risk) – štatistická miera rizika na danom percentile spoľahlivosti
+    """)
 
 port, assumptions, shock_engine, corr, product_map, var_levels = _load_and_prepare()
-insurance_types = sorted(port["insurance_type"].unique().tolist())
+EXCLUDED_TYPES = {"UL_endowment"}
+insurance_types = sorted([t for t in port["insurance_type"].unique().tolist() if t not in EXCLUDED_TYPES])
 
 def _invalidate():
     st.session_state["do_compute"] = False
 
+
 with st.sidebar:
-    st.header("Inputs")
+    st.header("Vstupy")
+
+    sk_names = {
+        "term_insurance": "Rizikové životné poistenie (Term Insurance)",
+        "whole_of_life": "Trvalé životné poistenie (Whole of Life)",
+        "endowment": "Kapitálové životné poistenie (Endowment)",
+        "annuity": "Dôchodkové poistenie (Annuity)",
+    }
+
     sel_type = st.selectbox(
-        "insurance_type",
+        "Typ poistenia",
         insurance_types,
         key="insurance_type",
         on_change=_invalidate,
+        format_func=lambda x: sk_names.get(x, x)
     )
     sel_p = st.selectbox(
-        "percentile p",
+        "Percentil p",
         [float(x) for x in var_levels],
         index=len(var_levels) - 1,
         key="percentile",
         on_change=_invalidate,
+        format_func=lambda x: f"{x * 100:.1f}%"
     )
-    compute_btn = st.button("Compute", type="primary")
+    compute_btn = st.button("Vypočítať", type="primary")
 
 
 # Compute only on first load or after explicit click (avoids recompute-heavy checks on each widget change)
@@ -219,26 +245,32 @@ if st.session_state["do_compute"]:
     )
 
     c1, c2, c3 = st.columns(3)
-    c1.metric("RA_total (EUR)", f"{ra.ra_total:,.2f}")
-    c2.metric("RA_rate (%)", f"{(ra.ra_rate*100):.4f}")
-    c3.metric("BEL_base (EUR)", f"{ra.bel_base:,.2f}")
+    c1.metric("Riziková prirážka RA (EUR)", f"{ra.ra_total:,.2f}")
+    c2.metric("Sadzba RA (%)", f"{(ra.ra_rate*100):.4f}")
+    c3.metric("BEL základný (EUR)", f"{ra.bel_base:,.2f}")
 
-    st.subheader("SCR components (portfolio)")
+    st.subheader("NFR komponenty (portfólio)")
+    nfr_names = {
+        "mortality": "Mortalita (Mortality)",
+        "longevity": "Dlhovekosť (Longevity)",
+        "lapse": "Storno (Lapse)",
+        "expense": "Náklady (Expense)",
+    }
     scr_df = pd.DataFrame(
-        [{"component": k, "SCR": float(v)} for k, v in ra.scr_components.items()]
+        [{"Komponent": nfr_names.get(k, k), "NFR": float(v)} for k, v in ra.scr_components.items()]
     )
     scr_total = float(ra.ra_total)
     scr_df = pd.concat(
-        [scr_df, pd.DataFrame([{"component": "TOTAL (aggregated)", "SCR": scr_total}])],
+        [scr_df, pd.DataFrame([{"Komponent": "CELKOM (agregované)", "NFR": scr_total}])],
         ignore_index=True,
     )
     st.dataframe(
-        scr_df.style.format({"SCR": "{:,.2f}"}),
+        scr_df.style.format({"NFR": "{:,.2f}"}),
         width="stretch",
         hide_index=True,
     )
 
-    st.subheader("Consistency checks")
+    st.subheader("Kontrola konzistencie")
     checks = run_consistency_checks(
         insurance_type=sel_type,
         policies=policies,
@@ -251,13 +283,12 @@ if st.session_state["do_compute"]:
         index_stressed=assumptions.index_stressed,
     )
     chk_df = pd.DataFrame(
-        [{"check": c.name, "status": "PASS" if c.passed else "FAIL", "details": c.details} for c in checks]
+        [{"Kontrola": c.name, "STAV": "OK" if c.passed else "CHYBA", "Detaily": c.details} for c in checks]
     )
     st.dataframe(chk_df, width="stretch", hide_index=True)
 
     st.subheader("Export")
 
-    # priprav export DF
     ra_export_df = pd.DataFrame([{
         "insurance_type": ra.insurance_type,
         "percentile": ra.percentile,
@@ -266,31 +297,22 @@ if st.session_state["do_compute"]:
         "RA_rate": ra.ra_rate,
     }])
 
-    scr_export_df = pd.DataFrame([{"component": k, "SCR": v} for k, v in ra.scr_components.items()])
+    scr_export_df = pd.DataFrame([{"Komponent": {
+            "mortality": "Mortalita (Mortality)",
+            "longevity": "Dlhovekosť (Longevity)",
+            "lapse": "Stornovosť (Lapse)",
+            "expense": "Náklady (Expense)",
+        }.get(k, k), "NFR": float(v)} for k, v in ra.scr_components.items()])
 
-    c_dl, c_save = st.columns(2)
-
-    with c_dl:
-        st.markdown("**Download (recommended for deployed app)**")
-        st.download_button(
-            label="Download ra_results.csv",
-            data=ra_export_df.to_csv(index=False).encode("utf-8"),
-            file_name="ra_results.csv",
-            mime="text/csv",
-        )
-        st.download_button(
-            label="Download scr_components.csv",
-            data=scr_export_df.to_csv(index=False).encode("utf-8"),
-            file_name="scr_components.csv",
-            mime="text/csv",
-        )
-
-    with c_save:
-        st.markdown("**Save to outputs/ (local / debug)**")
-        out_dir = _ensure_outputs_dir()
-        if st.button("Save CSV to outputs/"):
-            ra_export_df.to_csv(out_dir / "ra_results.csv", index=False, encoding="utf-8")
-            scr_export_df.to_csv(out_dir / "scr_components.csv", index=False, encoding="utf-8")
-            st.success(f"Saved to {out_dir}")
-        st.caption("On Streamlit Cloud this saves on the server (not to the user's PC). Use Download.")
-
+    st.download_button(
+        label="Stiahnuť ra_results.csv",
+        data=ra_export_df.to_csv(index=False).encode("utf-8"),
+        file_name="ra_results.csv",
+        mime="text/csv",
+    )
+    st.download_button(
+        label="Stiahnuť nfr_components.csv",
+        data=scr_export_df.to_csv(index=False).encode("utf-8"),
+        file_name="nfr_components.csv",
+        mime="text/csv",
+    )
