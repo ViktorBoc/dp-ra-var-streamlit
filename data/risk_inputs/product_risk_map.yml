@@ -23,7 +23,6 @@ products:
     sk_name: Dôchodkové poistenie
     components:
     - longevity
-    - lapse
     - expense
 component_to_shocks:
   mortality:
