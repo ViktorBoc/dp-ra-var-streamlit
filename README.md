@@ -1,6 +1,6 @@
 # Risk Adjustment (VaR) pre životné poistenie (Streamlit)
 
-Tento projekt je webová aplikácia v **Streamlit**, ktorá pre vybrané portfólio životných zmlúv vypočíta **Risk Adjustment (RA)** metódou **VaR** podľa štandardu **IFRS 17**. Rizikové komponenty sa agregujú cez **variance–covariance** prístup (korelačná matica). Všetko funguje iba z lokálnych súborov (žiadne externé DB ani internetové API).
+Tento projekt je webová aplikácia v **Streamlit**, ktorá pre vybrané portfólio zmlúv vypočíta **Risk Adjustment (RA)** metódou **VaR** podľa štandardu **IFRS 17**. Rizikové komponenty sa agregujú cez **variance–covariance** prístup (korelačná matica). Všetko funguje iba z lokálnych súborov (žiadne externé DB ani internetové API).
 
 ---
 
@@ -21,7 +21,7 @@ Appka vypočíta pre portfólio všetkých zmlúv daného typu (len aktívne sta
 - **Grafy**: BEL a RA po rokoch, NFR komponenty, RA release, BEL základný vs šokovaný
 - **Kontrola konzistencie** (OK/CHYBA)
 
-Export (CSV s UTF-8 BOM kódovaním pre správne zobrazenie v Exceli):
+Export:
 - `ra_results.csv` – súhrnné výsledky RA
 - `nfr_components.csv` – NFR komponenty s BEL šokovaným
 - `ra_po_rokoch.csv` – rozpustenie RA po rokoch
@@ -34,7 +34,7 @@ Export (CSV s UTF-8 BOM kódovaním pre správne zobrazenie v Exceli):
 ### Portfólio (filter)
 - zahrnuté len `agreement_state ∈ {new, paid_up}`
 - `declined`, `closed` ignorované
-- `UL_endowment` je vylúčený z UI (finančné riziká nie sú modelované)
+- `UL_endowment` je vylúčený z UI
 
 ### Valuation date a projekčný horizont
 - valuation date je fixný: **2026-01-01**
@@ -58,7 +58,9 @@ Export (CSV s UTF-8 BOM kódovaním pre správne zobrazenie v Exceli):
   - `sv(t) = surrender_value * max(0, horizon - t) / horizon`
   - v roku 0 = plná odkupná hodnota, v poslednom roku = 0
 - hodnota `surrender_value` sa načítava priamo zo stĺpca v `dummy_data.csv`
-- pre term_insurance je typicky 0 (čisté rizikové poistenie bez nasporenej hodnoty)
+- pre term_insurance a whole_of_life je surrender_value = 0 (čisté rizikové poistenie bez nasporenej hodnoty)
+- pre endowment má zmysluplnú hodnotu
+- pre annuity je síce v dátach nenulová ale v praxi sa nevypláca keďže annuity nemá lapse rates
 
 ### Diskontovanie a inflácia
 - benefity aj náklady sa diskontujú pomocou diskontných faktorov z `risk_free_curve.csv`
@@ -67,7 +69,7 @@ Export (CSV s UTF-8 BOM kódovaním pre správne zobrazenie v Exceli):
   - v expense strese: percentilový geometrický blend medzi base a stressed indexom
 
 ### Paid-up a Annuity
-- `paid_up`: premium inflow = 0 (zmluva je splatená, klient už neplatí)
+- `paid_up`: zmluva stále aktívna, poistné sa platí ak ešte trvá premium_payment_term
 - `annuity`: `annual_payment = sum_insured` (sum_insured je ročná renta), premium inflow = 0
 
 ### Produkty (cash-flow)
@@ -112,6 +114,8 @@ Potom:
 
 Pri `p = 0.60` je scale nízky → RA malé. Pri `p = 0.995` je scale = 1 → plný šok.
 
+Metóda predpokladá že rozdelenie strát je **normálne** – šoky sa škálujú lineárne cez pomer kvantilov štandardného normálneho rozdelenia N(0,1).
+
 ---
 
 ## Rizikové komponenty
@@ -129,7 +133,7 @@ Pri `p = 0.60` je scale nízky → RA malé. Pri `p = 0.995` je scale = 1 → pl
 - `lapse_down`: multiplikátor 0.5 s absolútnym capom 0.2 (trvalý pokles stornovania)
 - `mass_lapse`: jednorazové hromadné storno 40% v prvom roku
 - `NFR_lapse = max(NFR_up, NFR_down, NFR_mass)`
-- platí pre: `term_insurance`, `whole_of_life`, `endowment`
+- platí pre: `term_insurance`, `whole_of_life`, `endowment` (annuity nemá lapse)
 
 ### Expense (náklady) – kombinovaný stres
 - `expense_level`: multiplikátor 1.10 na úroveň nákladov (+10%)
@@ -150,7 +154,7 @@ Korelačná matica je konzistentná so Solvency II štandardom:
 | **lapse** | 0.00 | 0.25 | 1.00 | 0.50 |
 | **expense** | 0.25 | 0.25 | 0.50 | 1.00 |
 
-Zdroj: `data/risk_inputs/correlation_matrix.csv` – hodnoty určené na základe Solvency II štandardnej formulky.
+`data/risk_inputs/correlation_matrix.csv`
 
 ---
 
@@ -168,7 +172,7 @@ Appka po výpočte zobrazí:
 ## Datové súbory – pôvod a popis
 
 ### `data/portfolio/dummy_data.csv`
-Fiktívne portfólio 1000 životných zmlúv. Obsahuje 5 typov poistenia (`term_insurance`, `whole_of_life`, `endowment`, `annuity`, `UL_endowment`) a 4 stavy zmlúv (`new`, `paid_up`, `declined`, `closed`). Dáta boli generované náhodne ako demo portfólio. Kľúčové stĺpce používané modelom:
+Fiktívne portfólio 1000 zmlúv. Obsahuje 5 typov poistenia (`term_insurance`, `whole_of_life`, `endowment`, `annuity`, `UL_endowment`) a 4 stavy zmlúv (`new`, `paid_up`, `declined`, `closed`). Kľúčové stĺpce používané modelom:
 
 - `insurance_type`, `agreement_state`, `date_of_birth`, `issue_date`
 - `insurance_term` – doba trvania zmluvy v rokoch (9999 = doživotná pre whole_of_life)
@@ -180,16 +184,13 @@ Fiktívne portfólio 1000 životných zmlúv. Obsahuje 5 typov poistenia (`term_
 **Úprava poistného pre term_insurance:** keďže náhodne generované poistné bolo príliš vysoké voči riziku (priemer ~3.4% zo sumy), bolo prenasobené koeficientom 0.15 čím sa priemer znížil na ~0.5% zo sumy – realistickejší pomer pre rizikové životné poistenie.
 
 ### `data/assumptions/mortality.csv`
-Tabuľka mortality pre vek 0–104, stĺpce `age` a `qx`. Zdroj: **Štatistický úrad SR** – všeobecné populačné tabuľky mortality pre Slovensko. Obsahuje 105 riadkov (vek 0 až 104).
+Tabuľka mortality pre vek 0–104, stĺpce `age` a `qx`. Zdroj: **Štatistický úrad SR (2024)** – všeobecné populačné tabuľky mortality pre Slovensko. Obsahuje 105 riadkov (vek 0 až 104).
 
 ### `data/assumptions/lapse_rates.csv`
-Ročné miery stornovania podľa produktu a doby trvania zmluvy (roky 1–50), stĺpce `product_type`, `duration_year`, `lapse_rate`. Hodnoty boli stanovené odborne – realistické lapse rates pre slovenský trh:
-- rok 1: 12% (term), klesá do roka 10 na 6% a stabilizuje sa
-- `annuity` nemá lapse (dôchodky sa štandardne nestornujú)
-- `UL_endowment` nie je zahrnutý
+Ročné miery stornovania podľa produktu a doby trvania zmluvy (roky 1–50), stĺpce `product_type`, `duration_year`, `lapse_rate`. Obsahuje záznamy pre `term_insurance`, `endowment` a `whole_of_life`. `annuity` lapse rates nemá – dôchodky sa štandardne nestornujú.
 
 ### `data/assumptions/expenses.json`
-Nákladové predpoklady pre každý produkt. Hodnoty boli odborne stanovené:
+Nákladové predpoklady pre každý produkt. Hodnoty boli stanovené nasledovne:
 - `acquisition_rate = 1%` zo sumy – jednorazový akvizičný náklad pri uzatvorení
 - `maintenance_per_policy = 25 EUR/rok` – ročné správne náklady na zmluvu
 - `commission_first_year_rate = 50%` z poistného – štandardná prvá provízia
@@ -231,7 +232,7 @@ Mapovanie produktov na rizikové komponenty ktoré sa pre daný produkt počíta
 Zoznam povolených percentilov spoľahlivosti: `[0.60, 0.65, 0.70, 0.75, 0.80, 0.85, 0.90, 0.95, 0.995]`.
 
 ### `data/config/var_scaling.yml`
-Konfigurácia metódy škálovania šokov (normal quantile ratio). Dokumentačný súbor, logika je implementovaná v `src/scaling.py`.
+Konfigurácia metódy škálovania šokov – normálny kvantilový pomer (normal quantile ratio) predpokladajúci normálne rozdelenie strát N(0,1). Logika implementovaná v `src/scaling.py`.
 
 ---
 
