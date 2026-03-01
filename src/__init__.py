@@ -1,1 +1,1 @@
-"""RA VaR Streamlit MVP package."""
+"""RA VaR Streamlit package."""

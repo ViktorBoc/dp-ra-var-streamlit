@@ -7,7 +7,6 @@ import numpy as np
 
 from .utils import Policy, clamp
 
-
 @dataclass(frozen=True)
 class Assumptions:
     mortality_qx_by_age: Dict[int, float]
@@ -17,14 +16,12 @@ class Assumptions:
     index_stressed: np.ndarray
     expenses: Dict[str, Any]
 
-
 @dataclass(frozen=True)
 class Scenario:
     qx_multiplier: float = 1.0
     lapse_rates: Optional[np.ndarray] = None
     expense_level_multiplier: float = 1.0
     inflation_index: Optional[np.ndarray] = None
-
 
 def _qx_for_age(mortality_qx_by_age: Dict[int, float], age: int) -> float:
     if age in mortality_qx_by_age:
@@ -33,7 +30,6 @@ def _qx_for_age(mortality_qx_by_age: Dict[int, float], age: int) -> float:
     if age <= ages[0]:
         return float(mortality_qx_by_age[ages[0]])
     return float(mortality_qx_by_age[ages[-1]])
-
 
 def _lapse_for_duration(lapse_by_product_duration: Dict[str, np.ndarray], product: str, duration_year: int) -> float:
     arr = lapse_by_product_duration.get(product)
@@ -45,7 +41,6 @@ def _lapse_for_duration(lapse_by_product_duration: Dict[str, np.ndarray], produc
     if d >= 50:
         return float(arr[-1])
     return float(arr[d - 1])
-
 
 def _get_expense_params(expenses: Dict[str, Any], product: str) -> Dict[str, float]:
     """Extract expense parameters for a specific product."""
@@ -70,7 +65,6 @@ def _get_expense_params(expenses: Dict[str, Any], product: str) -> Dict[str, flo
         "claim_handling_rate": 0.0,
     }
 
-
 def project_policy_bel(policy: Policy, a: Assumptions, s: Scenario) -> Dict[str, float]:
     T = int(policy.horizon)
     if T <= 0:
@@ -83,7 +77,6 @@ def project_policy_bel(policy: Policy, a: Assumptions, s: Scenario) -> Dict[str,
     product = policy.insurance_type
     sum_insured = float(policy.sum_insured)
     premium = float(policy.premium)
-
 
     exp_params = _get_expense_params(a.expenses, product)
     acq_rate = exp_params["acquisition_rate"]
@@ -118,16 +111,18 @@ def project_policy_bel(policy: Policy, a: Assumptions, s: Scenario) -> Dict[str,
             S_next = 0.0
 
         inflow = 0.0
-        if product in ("term_insurance", "whole_of_life", "endowment"):
-            inflow += premium * S
-        elif product == "annuity":
-            inflow += 0.0
-        else:
+        ppt = int(policy.premium_payment_term)
+        premium_active = (t <= ppt)
+        if premium_active and product != "annuity":
             inflow += premium * S
 
         outflow = 0.0
         if product in ("term_insurance", "whole_of_life", "endowment"):
             outflow += sum_insured * deaths
+
+        if lapses > 0.0 and policy.horizon > 0:
+            sv_t = float(policy.surrender_value) * max(0.0, (policy.horizon - t)) / policy.horizon
+            outflow += sv_t * lapses
 
         if product == "annuity":
             annual_payment = sum_insured
@@ -166,7 +161,6 @@ def project_policy_bel(policy: Policy, a: Assumptions, s: Scenario) -> Dict[str,
 
     bel = pv_out - pv_in
     return {"pv_inflows": float(pv_in), "pv_outflows": float(pv_out), "bel": float(bel)}
-
 
 def portfolio_bel(policies, a: Assumptions, s: Scenario) -> Dict[str, float]:
     pv_in = 0.0

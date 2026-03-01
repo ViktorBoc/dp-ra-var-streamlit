@@ -9,13 +9,11 @@ import pandas as pd
 from .ra import compute_ra
 from .stresses import ShockEngine
 
-
 @dataclass(frozen=True)
 class CheckResult:
     name: str
     passed: bool
     details: str = ""
-
 
 def check_discount_factors_monotone(discount_factors: np.ndarray) -> CheckResult:
     ok = bool(np.all(discount_factors[:-1] >= discount_factors[1:]))
@@ -39,7 +37,6 @@ def check_ra_monotone(ra_by_p: List[Tuple[float, float]], tol: float = 1e-9) -> 
         details=f"RA kleslo z p={ps[i]:.3f} to p={ps[i+1]:.3f} ({ras[i]:.6g} -> {ras[i+1]:.6g}).",
     )
 
-
 def check_stressed_probs_in_range(
     qx_min: float, qx_max: float, lapse_min: float, lapse_max: float
 ) -> List[CheckResult]:
@@ -57,7 +54,6 @@ def check_stressed_probs_in_range(
             details=f"min={lapse_min:.6g}, max={lapse_max:.6g}",
         ),
     ]
-
 
 def run_consistency_checks(
     insurance_type: str,
@@ -92,7 +88,6 @@ def run_consistency_checks(
 
     p_max = float(max(var_levels))
 
-    # qx bounds (mortality/longevity)
     qx_samples = []
     for age in range(0, 106):
         base = assumptions.mortality_qx_by_age.get(age)
@@ -110,7 +105,6 @@ def run_consistency_checks(
         qx_min = 0.0
         qx_max = 0.0
 
-    # lapse bounds (lapse shocks)
     if "lapse" in product_components:
         base_curve = assumptions.lapse_by_product_duration.get(insurance_type, np.zeros(50))
         lapses = []

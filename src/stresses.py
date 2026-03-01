@@ -8,12 +8,10 @@ import numpy as np
 from .scaling import VarScaler
 from .utils import clamp
 
-
 @dataclass(frozen=True)
 class ShockDefinitions:
     risks: Dict[str, dict]
     base_confidence: float = 0.995
-
 
 class ShockEngine:
     """Scale shocks from 99.5% to arbitrary p using normal quantile ratio."""

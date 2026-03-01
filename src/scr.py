@@ -9,16 +9,14 @@ import pandas as pd
 from .cashflows import Assumptions, Scenario, portfolio_bel
 from .stresses import ShockEngine
 
-
 COMPONENTS = ["mortality", "longevity", "lapse", "expense"]
-
 
 @dataclass(frozen=True)
 class SCRResult:
     bel_base: float
     scr_by_component: Dict[str, float]
+    bel_stressed_by_component: Dict[str, float]
     scr_total: float
-
 
 def aggregate_scr(scr_by_component: Dict[str, float], corr: pd.DataFrame) -> float:
     order = list(corr.columns)
@@ -26,7 +24,6 @@ def aggregate_scr(scr_by_component: Dict[str, float], corr: pd.DataFrame) -> flo
     C = corr.loc[order, order].values.astype(float)
     x = float(v.T @ C @ v)
     return float(np.sqrt(max(0.0, x)))
-
 
 def compute_scr_components(
     policies,
@@ -42,22 +39,24 @@ def compute_scr_components(
     bel_base = float(base["bel"])
 
     scr = {k: 0.0 for k in COMPONENTS}
+    bel_stressed = {k: bel_base for k in COMPONENTS}
 
     # Mortality
     if "mortality" in product_components:
         qx_mult = shock_engine.scaled_value("mortality", p)
         bel = portfolio_bel(policies, a, Scenario(qx_multiplier=qx_mult))["bel"]
+        bel_stressed["mortality"] = float(bel)
         scr["mortality"] = max(0.0, float(bel) - bel_base)
 
     # Longevity
     if "longevity" in product_components:
         qx_mult = shock_engine.scaled_value("longevity", p)
         bel = portfolio_bel(policies, a, Scenario(qx_multiplier=qx_mult))["bel"]
+        bel_stressed["longevity"] = float(bel)
         scr["longevity"] = max(0.0, float(bel) - bel_base)
 
-    # Lapse (3 scenarios) – policy-wise, because lapse depends on duration per policy
+    # Lapse
     if "lapse" in product_components:
-
         def portfolio_bel_with_lapse(risk_name: str) -> float:
             total_bel = 0.0
             for pol in policies:
@@ -80,9 +79,18 @@ def compute_scr_components(
         scr_up = max(0.0, bel_up - bel_base)
         scr_down = max(0.0, bel_down - bel_base)
         scr_mass = max(0.0, bel_mass - bel_base)
-        scr["lapse"] = max(scr_up, scr_down, scr_mass)
 
-    # Expense (combined: level + inflation)
+        # worst case scenario
+        worst = max(scr_up, scr_down, scr_mass)
+        if worst == scr_up:
+            bel_stressed["lapse"] = bel_up
+        elif worst == scr_down:
+            bel_stressed["lapse"] = bel_down
+        else:
+            bel_stressed["lapse"] = bel_mass
+        scr["lapse"] = worst
+
+    # Expense
     if "expense" in product_components:
         level = shock_engine.scaled_value("expense_level", p)
         scale = shock_engine.scale_factor(p)
@@ -90,7 +98,13 @@ def compute_scr_components(
         bel = portfolio_bel(
             policies, a, Scenario(expense_level_multiplier=level, inflation_index=infl_index)
         )["bel"]
+        bel_stressed["expense"] = float(bel)
         scr["expense"] = max(0.0, float(bel) - bel_base)
 
     total = aggregate_scr(scr, corr)
-    return SCRResult(bel_base=bel_base, scr_by_component=scr, scr_total=float(total))
+    return SCRResult(
+        bel_base=bel_base,
+        scr_by_component=scr,
+        bel_stressed_by_component=bel_stressed,
+        scr_total=float(total),
+    )

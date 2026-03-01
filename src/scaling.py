@@ -4,7 +4,6 @@ from dataclasses import dataclass
 
 from scipy.stats import norm
 
-
 @dataclass(frozen=True)
 class VarScaler:
     base_confidence: float = 0.995

@@ -9,7 +9,6 @@ from .scr import compute_scr_components, SCRResult
 from .stresses import ShockEngine
 from .utils import safe_div
 
-
 @dataclass(frozen=True)
 class RAResult:
     insurance_type: str
@@ -18,7 +17,7 @@ class RAResult:
     ra_total: float
     ra_rate: float
     scr_components: Dict[str, float]
-
+    bel_stressed_by_component: Dict[str, float]
 
 def compute_ra(
     insurance_type: str,
@@ -51,4 +50,5 @@ def compute_ra(
         ra_total=ra_total,
         ra_rate=ra_rate,
         scr_components=scr_res.scr_by_component,
+        bel_stressed_by_component=scr_res.bel_stressed_by_component,
     )
