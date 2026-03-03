@@ -245,7 +245,7 @@ if st.session_state["do_compute"]:
     )
 
     c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Riziková prirážka RA (EUR)", f"{ra.ra_total:,.2f}")
+    c1.metric("Riziková úprava z nefinančného rizika - RA (EUR)", f"{ra.ra_total:,.2f}")
     c2.metric("Sadzba RA (%)", f"{(ra.ra_rate * 100):.4f}")
     c3.metric("BEL základný (EUR)", f"{ra.bel_base:,.2f}")
     c4.metric("Peňažné toky na splnenie záväzkov - FCF (EUR)", f"{ra.bel_base + ra.ra_total:,.2f}")
@@ -361,17 +361,40 @@ if st.session_state["do_compute"]:
         buf.seek(0)
         return buf.getvalue()
 
+    # Vypočítaj RA pre všetky percentily
+    ra_by_p = []
+    for p_val in [float(x) for x in var_levels]:
+        r_p = compute_ra(
+            insurance_type=sel_type,
+            percentile=p_val,
+            policies=policies,
+            assumptions=assumptions,
+            corr=corr,
+            product_components=components,
+            shock_engine=shock_engine,
+            index_base=assumptions.index_base,
+            index_stressed=assumptions.index_stressed,
+        )
+        ra_by_p.append((p_val, float(r_p.ra_total)))
+
     # --- Graf 1: BEL a RA po rokoch ---
-    fig1, ax1 = plt.subplots(figsize=(6, 3))
-    ax1.plot(ra_schedule_df["Rok"], ra_schedule_df["BEL (EUR)"] / 1e6, label="BEL základný", color="#1f77b4",
-             linewidth=2)
-    ax1.plot(ra_schedule_df["Rok"], ra_schedule_df["RA na začiatku roka (EUR)"] / 1e6, label="RA", color="#ff7f0e",
-             linewidth=2, linestyle="--")
-    ax1.set_xlabel("Rok")
-    ax1.set_ylabel("EUR (mil.)")
-    ax1.set_title("BEL a RA po rokoch")
-    ax1.legend()
-    ax1.grid(True, alpha=0.3)
+    fig1, (ax1_l, ax1_r) = plt.subplots(1, 2, figsize=(10, 3))
+
+    ax1_l.plot(ra_schedule_df["Rok"], ra_schedule_df["BEL (EUR)"] / 1e3,
+               color="#1f77b4", linewidth=2)
+    ax1_l.set_xlabel("Rok")
+    ax1_l.set_ylabel("EUR (tis.)")
+    ax1_l.set_title("BEL základný po rokoch")
+    ax1_l.grid(True, alpha=0.3)
+
+    ax1_r.plot(ra_schedule_df["Rok"], ra_schedule_df["RA na začiatku roka (EUR)"] / 1e3,
+               color="#ff7f0e", linewidth=2, linestyle="--")
+    ax1_r.set_xlabel("Rok")
+    ax1_r.set_ylabel("EUR (tis.)")
+    ax1_r.set_title("RA po rokoch")
+    ax1_r.grid(True, alpha=0.3)
+
+    fig1.tight_layout()
     st.pyplot(fig1, use_container_width=False)
     st.download_button("Stiahnuť graf: BEL a RA po rokoch", _fig_to_download(fig1),
                        file_name="graf_bel_ra_po_rokoch.png", mime="image/png")
@@ -380,17 +403,19 @@ if st.session_state["do_compute"]:
     # --- Graf 2: NFR komponenty ---
     nfr_plot = scr_df[scr_df["Komponent"] != "CELKOM (agregované)"].copy()
     fig2, ax2 = plt.subplots(figsize=(5, 3))
-    bars = ax2.bar(nfr_plot["Komponent"], nfr_plot["NFR"], color=["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728"])
-    ax2.set_ylabel("EUR")
+    bars = ax2.bar(nfr_plot["Komponent"], nfr_plot["NFR"] / 1e3,
+                   color=["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728"])
+    ax2.set_ylabel("EUR (tis.)")
     ax2.set_title("NFR komponenty")
     ax2.tick_params(axis="x", rotation=15)
     ax2.grid(True, axis="y", alpha=0.3)
     for bar in bars:
-        ax2.text(bar.get_x() + bar.get_width() / 2, bar.get_height(), f"{bar.get_height():,.0f}", ha="center",
-                 va="bottom", fontsize=9)
+        val = bar.get_height()
+        ax2.text(bar.get_x() + bar.get_width() / 2, val,
+                 f"{val:,.1f}", ha="center", va="bottom", fontsize=9)
     st.pyplot(fig2, use_container_width=False)
-    st.download_button("Stiahnuť graf: NFR komponenty", _fig_to_download(fig2), file_name="graf_nfr_komponenty.png",
-                       mime="image/png")
+    st.download_button("Stiahnuť graf: NFR komponenty", _fig_to_download(fig2),
+                       file_name="graf_nfr_komponenty.png", mime="image/png")
     plt.close(fig2)
 
     # --- Graf 3: RA release po rokoch ---
@@ -429,6 +454,31 @@ if st.session_state["do_compute"]:
                        file_name="graf_bel_sokovany.png", mime="image/png")
     plt.close(fig4)
 
+    # --- Graf 5: RA podľa percentilov ---
+    fig5, (ax5_l, ax5_r) = plt.subplots(1, 2, figsize=(10, 3))
+
+    p_labels = ["99.5%" if p == 0.995 else f"{p*100:.0f}%" for p, _ in ra_by_p]
+    ra_values = [v / 1e3 for _, v in ra_by_p]
+    ra_rates = [v / ra.bel_base * 100 for _, v in ra_by_p]
+
+    ax5_l.plot(p_labels, ra_values, color="#1f77b4", linewidth=2, marker="o")
+    ax5_l.set_xlabel("Percentil")
+    ax5_l.set_ylabel("EUR (tis.)")
+    ax5_l.set_title("RA podľa percentilov (EUR)")
+    ax5_l.grid(True, alpha=0.3)
+
+    ax5_r.plot(p_labels, ra_rates, color="#ff7f0e", linewidth=2, marker="o")
+    ax5_r.set_xlabel("Percentil")
+    ax5_r.set_ylabel("Sadzba RA (%)")
+    ax5_r.set_title("Sadzba RA podľa percentilov (%)")
+    ax5_r.grid(True, alpha=0.3)
+
+    fig5.tight_layout()
+    st.pyplot(fig5, use_container_width=False)
+    st.download_button("Stiahnuť graf: RA podľa percentilov", _fig_to_download(fig5),
+                       file_name="graf_ra_percentily.png", mime="image/png")
+    plt.close(fig5)
+
     st.subheader("Kontrola konzistencie")
     checks = run_consistency_checks(
         insurance_type=sel_type,
@@ -464,8 +514,8 @@ if st.session_state["do_compute"]:
     } for k, v in ra.scr_components.items()])
 
     ra_export_df.columns = [
-        "Typ poistenia", "Percentil", "BEL základný", "Riziková prirážka RA",
-        "Sadzba RA", "Peňažné toky na splnenie záväzkov (FCF)"
+        "Typ poistenia", "Percentil", "BEL základný", "Riziková úprava z nefinančného rizika - RA (EUR)",
+        "Sadzba RA", "Peňažné toky na splnenie záväzkov - FCF (EUR)"
     ]
 
     ra_schedule_export = ra_schedule_df.copy()

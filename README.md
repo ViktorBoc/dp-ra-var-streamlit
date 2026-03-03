@@ -181,8 +181,6 @@ Fiktívne portfólio 1000 zmlúv. Obsahuje 5 typov poistenia (`term_insurance`, 
 - `sum_insured` – poistná suma v EUR
 - `surrender_value` – odkupná hodnota v EUR (0 pre term_insurance)
 
-**Úprava poistného pre term_insurance:** keďže náhodne generované poistné bolo príliš vysoké voči riziku (priemer ~3.4% zo sumy), bolo prenasobené koeficientom 0.15 čím sa priemer znížil na ~0.5% zo sumy – realistickejší pomer pre rizikové životné poistenie.
-
 ### `data/assumptions/mortality.csv`
 Tabuľka mortality pre vek 0–104, stĺpce `age` a `qx`. Zdroj: **Štatistický úrad SR (2024)** – všeobecné populačné tabuľky mortality pre Slovensko. Obsahuje 105 riadkov (vek 0 až 104).
 
