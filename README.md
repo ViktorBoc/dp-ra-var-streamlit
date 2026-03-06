@@ -18,7 +18,7 @@ Appka vypočíta pre portfólio všetkých zmlúv daného typu (len aktívne sta
 - **Peňažné toky na splnenie záväzkov – FCF (EUR)** = BEL_base + RA_total (IFRS 17 záväzok)
 - **NFR komponenty (EUR)**: `mortality`, `longevity`, `lapse`, `expense` vrátane BEL šokovaného pre každý komponent
 - **RA po rokoch** = tabuľka rozpustenia RA počas trvania portfólia
-- **Grafy**: BEL a RA po rokoch, NFR komponenty, RA release, BEL základný vs šokovaný
+- **Grafy**: BEL a RA po rokoch (dvojgraf), NFR komponenty, RA release po rokoch, BEL základný vs šokovaný, RA podľa percentilov (EUR aj sadzba), porovnanie RA sadzby naprieč produktmi, heatmapa RA sadzby produkty × percentily
 - **Kontrola konzistencie** (OK/CHYBA)
 
 Export:

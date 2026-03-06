@@ -225,6 +225,37 @@ if "do_compute" not in st.session_state:
 if compute_btn:
     st.session_state["do_compute"] = True
 
+# --- Súhrn portfólia (zobrazuje sa vždy po výbere typu) ---
+port_preview = port[port["insurance_type"] == sel_type].copy()
+port_preview = port_preview[port_preview["agreement_state"].isin(["new", "paid_up"])]
+
+if len(port_preview) > 0:
+    st.subheader("Súhrn portfólia")
+
+    from datetime import date
+    valuation_date = date(2026, 1, 1)
+    port_preview["vek"] = port_preview["date_of_birth"].apply(
+        lambda x: int((valuation_date - pd.to_datetime(x).date()).days / 365.25)
+    )
+
+    count_new = int((port_preview["agreement_state"] == "new").sum())
+    count_paid = int((port_preview["agreement_state"] == "paid_up").sum())
+    avg_age = float(port_preview["vek"].mean())
+    avg_sum = float(port_preview["sum_insured"].mean())
+    avg_prem = float(port_preview["premium"].mean()) if "premium" in port_preview.columns else float(port_preview["annual_premium"].mean())
+
+    summary_df = pd.DataFrame([
+        {"Ukazovateľ": "Počet zmlúv celkom", "Hodnota": f"{count_new + count_paid}"},
+        {"Ukazovateľ": "Z toho new", "Hodnota": f"{count_new}"},
+        {"Ukazovateľ": "Z toho paid_up", "Hodnota": f"{count_paid}"},
+        {"Ukazovateľ": "Priemerný vek poisteného", "Hodnota": f"{avg_age:.1f} rokov"},
+        {"Ukazovateľ": "Priemerná poistná suma" if sel_type != "annuity" else "Priemerná ročná renta",
+        "Hodnota": f"{avg_sum:,.0f} EUR"},
+        {"Ukazovateľ": "Priemerné ročné poistné", "Hodnota": f"{avg_prem:,.0f} EUR"} if sel_type != "annuity" else {
+        "Ukazovateľ": "Ročné poistné", "Hodnota": "0 EUR (annuity neplatí poistné)"},
+    ])
+    st.dataframe(summary_df, hide_index=True, width="stretch")
+
 if st.session_state["do_compute"]:
     port_sel = port[port["insurance_type"] == sel_type].copy()
     policies = _build_policies(port_sel)
@@ -402,7 +433,7 @@ if st.session_state["do_compute"]:
 
     # --- Graf 2: NFR komponenty ---
     nfr_plot = scr_df[scr_df["Komponent"] != "CELKOM (agregované)"].copy()
-    fig2, ax2 = plt.subplots(figsize=(4, 2.5))
+    fig2, ax2 = plt.subplots(figsize=(4, 3.5))
     bars = ax2.bar(nfr_plot["Komponent"], nfr_plot["NFR"] / 1e3,
                    color=["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728"])
     ax2.set_ylabel("EUR (tis.)")
@@ -478,6 +509,104 @@ if st.session_state["do_compute"]:
     st.download_button("Stiahnuť graf: RA podľa percentilov", _fig_to_download(fig5),
                        file_name="graf_ra_percentily.png", mime="image/png")
     plt.close(fig5)
+
+    # --- Graf 6: RA sadzba všetkých produktov pri aktuálnom percentile ---
+    st.subheader("Porovnanie produktov")
+    all_types = [t for t in port["insurance_type"].unique().tolist() if t not in EXCLUDED_TYPES]
+    ra_by_product = []
+    for prod in all_types:
+        port_prod = port[port["insurance_type"] == prod].copy()
+        pol_prod = _build_policies(port_prod)
+        if not pol_prod:
+            continue
+        comp_prod = product_map.get(prod, {}).get("components", ["mortality", "longevity", "lapse", "expense"])
+        ra_prod = compute_ra(
+            insurance_type=prod,
+            percentile=float(sel_p),
+            policies=pol_prod,
+            assumptions=assumptions,
+            corr=corr,
+            product_components=comp_prod,
+            shock_engine=shock_engine,
+            index_base=assumptions.index_base,
+            index_stressed=assumptions.index_stressed,
+        )
+        ra_by_product.append((prod, float(ra_prod.ra_rate) * 100, float(ra_prod.ra_total) / 1e3))
+
+    fig6, (ax6_l, ax6_r) = plt.subplots(1, 2, figsize=(10, 4.5))
+    prod_labels = [sk_names.get(p, p) for p, _, _ in ra_by_product]
+    prod_rates = [r for _, r, _ in ra_by_product]
+    prod_eur = [e for _, _, e in ra_by_product]
+
+    ax6_l.bar(prod_labels, prod_rates, color=["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728"])
+    ax6_l.set_ylabel("Sadzba RA (%)")
+    ax6_l.set_title(f"Sadzba RA podľa produktov (percentil {sel_p * 100:.1f}%)")
+    ax6_l.tick_params(axis="x", rotation=15)
+    ax6_l.grid(True, axis="y", alpha=0.3)
+    for bar, val in zip(ax6_l.patches, prod_rates):
+        ax6_l.text(bar.get_x() + bar.get_width() / 2, bar.get_height(),
+                   f"{val:.1f}%", ha="center", va="bottom", fontsize=9)
+
+    ax6_r.bar(prod_labels, prod_eur, color=["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728"])
+    ax6_r.set_ylabel("EUR (tis.)")
+    ax6_r.set_title(f"RA podľa produktov – EUR (percentil {sel_p * 100:.1f}%)")
+    ax6_r.tick_params(axis="x", rotation=15)
+    ax6_r.grid(True, axis="y", alpha=0.3)
+    for bar, val in zip(ax6_r.patches, prod_eur):
+        ax6_r.text(bar.get_x() + bar.get_width() / 2, bar.get_height(),
+                   f"{val:,.1f}", ha="center", va="bottom", fontsize=9)
+
+    fig6.tight_layout()
+    st.pyplot(fig6, use_container_width=False)
+    st.download_button("Stiahnuť graf: Porovnanie produktov", _fig_to_download(fig6),
+                       file_name="graf_porovnanie_produktov.png", mime="image/png")
+    plt.close(fig6)
+
+    # --- Graf 7: Heatmapa RA sadzby – produkty × percentily ---
+    st.info("Výpočet heatmapy prebieha pre všetky produkty a percentily – môže trvať chvíľu.")
+    heatmap_data = {}
+    for prod in all_types:
+        port_prod = port[port["insurance_type"] == prod].copy()
+        pol_prod = _build_policies(port_prod)
+        if not pol_prod:
+            continue
+        comp_prod = product_map.get(prod, {}).get("components", ["mortality", "longevity", "lapse", "expense"])
+        rates = []
+        for p_val in [float(x) for x in var_levels]:
+            ra_h = compute_ra(
+                insurance_type=prod,
+                percentile=p_val,
+                policies=pol_prod,
+                assumptions=assumptions,
+                corr=corr,
+                product_components=comp_prod,
+                shock_engine=shock_engine,
+                index_base=assumptions.index_base,
+                index_stressed=assumptions.index_stressed,
+            )
+            rates.append(float(ra_h.ra_rate) * 100)
+        heatmap_data[sk_names.get(prod, prod)] = rates
+
+    p_labels_hm = ["99.5%" if p == 0.995 else f"{p * 100:.0f}%" for p in [float(x) for x in var_levels]]
+    heatmap_df = pd.DataFrame(heatmap_data, index=p_labels_hm).T
+
+    fig7, ax7 = plt.subplots(figsize=(10, 3))
+    im = ax7.imshow(heatmap_df.values, aspect="auto", cmap="YlOrRd")
+    ax7.set_xticks(range(len(p_labels_hm)))
+    ax7.set_xticklabels(p_labels_hm)
+    ax7.set_yticks(range(len(heatmap_df.index)))
+    ax7.set_yticklabels(heatmap_df.index)
+    ax7.set_title("Sadzba RA (%) – produkty × percentily")
+    plt.colorbar(im, ax=ax7, label="Sadzba RA (%)")
+    for i in range(len(heatmap_df.index)):
+        for j in range(len(p_labels_hm)):
+            ax7.text(j, i, f"{heatmap_df.values[i, j]:.1f}%",
+                     ha="center", va="center", fontsize=8, color="black")
+    fig7.tight_layout()
+    st.pyplot(fig7, use_container_width=False)
+    st.download_button("Stiahnuť graf: Heatmapa RA", _fig_to_download(fig7),
+                       file_name="graf_heatmapa_ra.png", mime="image/png")
+    plt.close(fig7)
 
     st.subheader("Kontrola konzistencie")
     checks = run_consistency_checks(
