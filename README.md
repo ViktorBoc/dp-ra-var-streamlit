@@ -69,7 +69,7 @@ Export:
   - v expense strese: percentilový geometrický blend medzi base a stressed indexom
 
 ### Paid-up a Annuity
-- `paid_up`: zmluva stále aktívna, poistné sa platí ak ešte trvá premium_payment_term
+- `paid_up`: zmluva stále aktívna a vstupuje do výpočtu, avšak inflows (ročné poistné) sú vždy nulové – klient už zaplatil poistné vopred
 - `annuity`: `annual_payment = sum_insured` (sum_insured je ročná renta), premium inflow = 0
 
 ### Produkty (cash-flow)

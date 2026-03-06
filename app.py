@@ -197,9 +197,9 @@ with st.sidebar:
     st.header("Vstupy")
 
     sk_names = {
-        "term_insurance": "Rizikové životné poistenie (Term Insurance)",
+        "term_insurance": "Poistenie pre prípad smrti (Term Insurance)",
         "whole_of_life": "Trvalé životné poistenie (Whole of Life)",
-        "endowment": "Kapitálové životné poistenie (Endowment)",
+        "endowment": "Zmiešané poistenie (Endowment)",
         "annuity": "Dôchodkové poistenie (Annuity)",
     }
 

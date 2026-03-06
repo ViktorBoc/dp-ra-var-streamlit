@@ -112,7 +112,7 @@ def project_policy_bel(policy: Policy, a: Assumptions, s: Scenario) -> Dict[str,
 
         inflow = 0.0
         ppt = int(policy.premium_payment_term)
-        premium_active = (t <= ppt)
+        premium_active = (t <= ppt) and str(policy.agreement_state).lower() != "paid_up"
         if premium_active and product != "annuity":
             inflow += premium * S
 
