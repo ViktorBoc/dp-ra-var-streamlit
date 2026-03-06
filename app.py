@@ -402,7 +402,7 @@ if st.session_state["do_compute"]:
 
     # --- Graf 2: NFR komponenty ---
     nfr_plot = scr_df[scr_df["Komponent"] != "CELKOM (agregované)"].copy()
-    fig2, ax2 = plt.subplots(figsize=(5, 3))
+    fig2, ax2 = plt.subplots(figsize=(4, 2.5))
     bars = ax2.bar(nfr_plot["Komponent"], nfr_plot["NFR"] / 1e3,
                    color=["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728"])
     ax2.set_ylabel("EUR (tis.)")
@@ -420,7 +420,7 @@ if st.session_state["do_compute"]:
 
     # --- Graf 3: RA release po rokoch ---
     release_plot = ra_schedule_df[ra_schedule_df["Rok"] > 0].copy()
-    fig3, ax3 = plt.subplots(figsize=(6, 3))
+    fig3, ax3 = plt.subplots(figsize=(4, 2.5))
     colors = ["#2ca02c" if v >= 0 else "#d62728" for v in release_plot["RA release (EUR)"]]
     ax3.bar(release_plot["Rok"], release_plot["RA release (EUR)"] / 1e3, color=colors)
     ax3.set_xlabel("Rok")
@@ -437,7 +437,7 @@ if st.session_state["do_compute"]:
     bel_plot = scr_df[scr_df["Komponent"] != "CELKOM (agregované)"].copy()
     x = range(len(bel_plot))
     width = 0.35
-    fig4, ax4 = plt.subplots(figsize=(6, 3))
+    fig4, ax4 = plt.subplots(figsize=(4, 2.5))
     ax4.bar([i - width / 2 for i in x], [ra.bel_base / 1e6] * len(bel_plot), width, label="BEL základný",
             color="#1f77b4")
     ax4.bar([i + width / 2 for i in x],
