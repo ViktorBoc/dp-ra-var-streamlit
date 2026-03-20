@@ -251,8 +251,7 @@ if len(port_preview) > 0:
         {"Ukazovateľ": "Priemerný vek poisteného", "Hodnota": f"{avg_age:.1f} rokov"},
         {"Ukazovateľ": "Priemerná poistná suma" if sel_type != "annuity" else "Priemerná ročná renta",
         "Hodnota": f"{avg_sum:,.0f} EUR"},
-        {"Ukazovateľ": "Priemerné ročné poistné", "Hodnota": f"{avg_prem:,.0f} EUR"} if sel_type != "annuity" else {
-        "Ukazovateľ": "Ročné poistné", "Hodnota": "0 EUR (annuity neplatí poistné)"},
+        {"Ukazovateľ": "Priemerné ročné poistné", "Hodnota": f"{avg_prem:,.0f} EUR"},
     ])
     st.dataframe(summary_df, hide_index=True, width="stretch")
 

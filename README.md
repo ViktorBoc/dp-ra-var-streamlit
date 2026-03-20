@@ -70,7 +70,7 @@ Export:
 
 ### Paid-up a Annuity
 - `paid_up`: zmluva stále aktívna a vstupuje do výpočtu, avšak inflows (ročné poistné) sú vždy nulové – klient už zaplatil poistné vopred
-- `annuity`: `annual_payment = sum_insured` (sum_insured je ročná renta), premium inflow = 0
+- `annuity`: `annual_payment = sum_insured` (sum_insured je ročná renta), premium inflow sa počíta rovnako ako pre ostatné produkty (počas premium_payment_term, nulové pre paid_up zmluvy)
 
 ### Produkty (cash-flow)
 
@@ -79,7 +79,7 @@ Export:
 | `term_insurance` | poistné (počas premium_payment_term) | death benefit + surrender value pri lapse + náklady |
 | `whole_of_life` | poistné (počas premium_payment_term) | death benefit + surrender value pri lapse + náklady |
 | `endowment` | poistné (počas premium_payment_term) | death benefit + maturity benefit + surrender value pri lapse + náklady |
-| `annuity` | žiadne | ročné dôchodkové platby + náklady |
+| `annuity` | poistné (počas premium_payment_term) | ročné dôchodkové platby + náklady |
 
 ### BEL definícia
 - **BEL = PV(outflows) − PV(inflows)** (liability)
