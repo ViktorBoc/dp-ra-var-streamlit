@@ -24,7 +24,17 @@ from src.utils import (
 
 # ---------- Helpers ----------
 
-DEFAULT_PREMIUM_RATE_IF_MISSING = 0.02  # 2% of sum_insured
+DEFAULT_PREMIUM_RATE_IF_MISSING = 0.02  #2% of sum_insured
+
+def _sk_fmt(x, decimals=2):
+    """Slovenské formátovanie: medzera tisícky, desatinná čiarka."""
+    if not isinstance(x, (int, float)):
+        return str(x)
+    if isinstance(x, int) or decimals == 0:
+        s = f"{abs(x):,.0f}".replace(",", "\u00a0")
+        return f"-{s}" if x < 0 else s
+    s = f"{abs(x):,.{decimals}f}".replace(",", "\u00a0").replace(".", ",")
+    return f"-{s}" if x < 0 else s
 
 def _standardize_portfolio(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
@@ -216,7 +226,7 @@ with st.sidebar:
         index=len(var_levels) - 1,
         key="percentile",
         on_change=_invalidate,
-        format_func=lambda x: f"{x * 100:.1f}%"
+        format_func=lambda x: f"{x * 100:.1f}%".replace(".", ",")
     )
     compute_btn = st.button("Vypočítať", type="primary")
 
@@ -248,10 +258,10 @@ if len(port_preview) > 0:
         {"Ukazovateľ": "Počet zmlúv celkom", "Hodnota": f"{count_new + count_paid}"},
         {"Ukazovateľ": "Z toho new", "Hodnota": f"{count_new}"},
         {"Ukazovateľ": "Z toho paid_up", "Hodnota": f"{count_paid}"},
-        {"Ukazovateľ": "Priemerný vek poisteného", "Hodnota": f"{avg_age:.1f} rokov"},
+        {"Ukazovateľ": "Priemerný vek poisteného", "Hodnota": f"{_sk_fmt(avg_age, 1)} rokov"},
         {"Ukazovateľ": "Priemerná poistná suma" if sel_type != "annuity" else "Priemerná ročná renta",
-        "Hodnota": f"{avg_sum:,.0f} EUR"},
-        {"Ukazovateľ": "Priemerné ročné poistné", "Hodnota": f"{avg_prem:,.0f} EUR"},
+        "Hodnota": f"{_sk_fmt(avg_sum, 0)} EUR"},
+        {"Ukazovateľ": "Priemerné ročné poistné", "Hodnota": f"{_sk_fmt(avg_prem, 0)} EUR"},
     ])
     st.dataframe(summary_df, hide_index=True, width="stretch")
 
@@ -275,11 +285,10 @@ if st.session_state["do_compute"]:
     )
 
     c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Riziková úprava z nefinančného rizika - RA (EUR)", f"{ra.ra_total:,.2f}")
-    c2.metric("Sadzba RA (%)", f"{(ra.ra_rate * 100):.4f}")
-    c3.metric("BEL základný (EUR)", f"{ra.bel_base:,.2f}")
-    c4.metric("Peňažné toky na splnenie záväzkov - FCF (EUR)", f"{ra.bel_base + ra.ra_total:,.2f}")
-
+    c1.metric("Riziková úprava z nefinančného rizika - RA (EUR)", _sk_fmt(ra.ra_total, 2))
+    c2.metric("Sadzba RA (%)", _sk_fmt(ra.ra_rate * 100, 4))
+    c3.metric("BEL základný (EUR)", _sk_fmt(ra.bel_base, 2))
+    c4.metric("Peňažné toky na splnenie záväzkov - FCF (EUR)", _sk_fmt(ra.bel_base + ra.ra_total, 2))
     st.subheader("NFR komponenty (portfólio)")
     nfr_names = {
         "mortality": "Mortalita (Mortality)",
@@ -303,8 +312,8 @@ if st.session_state["do_compute"]:
     )
     st.dataframe(
         scr_df.style.format({
-            "BEL šokovaný (EUR)": lambda x: f"{x:,.2f}" if isinstance(x, float) else x,
-            "NFR": "{:,.2f}",
+            "BEL šokovaný (EUR)": lambda x: _sk_fmt(x, 2) if isinstance(x, (int, float)) else x,
+            "NFR": lambda x: _sk_fmt(x, 2),
         }),
         width="stretch",
         hide_index=True,
@@ -371,10 +380,10 @@ if st.session_state["do_compute"]:
 
     st.dataframe(
         ra_schedule_df.style.format({
-            "BEL (EUR)": "{:,.2f}",
-            "Sadzba RA (%)": "{:.4f}",
-            "RA na začiatku roka (EUR)": "{:,.2f}",
-            "RA release (EUR)": "{:,.2f}",
+            "BEL (EUR)": lambda x: _sk_fmt(x, 2),
+            "Sadzba RA (%)": lambda x: _sk_fmt(x, 4),
+            "RA na začiatku roka (EUR)": lambda x: _sk_fmt(x, 2),
+            "RA release (EUR)": lambda x: _sk_fmt(x, 2),
         }),
         width="stretch",
         hide_index=True,
@@ -442,7 +451,7 @@ if st.session_state["do_compute"]:
     for bar in bars:
         val = bar.get_height()
         ax2.text(bar.get_x() + bar.get_width() / 2, val,
-                 f"{val:,.1f}", ha="center", va="bottom", fontsize=9)
+                 _sk_fmt(val, 1), ha="center", va="bottom", fontsize=9)
     st.pyplot(fig2, use_container_width=False)
     st.download_button("Stiahnuť graf: NFR komponenty", _fig_to_download(fig2),
                        file_name="graf_nfr_komponenty.png", mime="image/png")
@@ -539,21 +548,21 @@ if st.session_state["do_compute"]:
 
     ax6_l.bar(prod_labels, prod_rates, color=["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728"])
     ax6_l.set_ylabel("Sadzba RA (%)")
-    ax6_l.set_title(f"Sadzba RA podľa produktov (percentil {sel_p * 100:.1f}%)")
+    ax6_l.set_title(f"Sadzba RA podľa produktov (percentil {_sk_fmt(sel_p * 100, 1)}%)")
     ax6_l.tick_params(axis="x", rotation=15)
     ax6_l.grid(True, axis="y", alpha=0.3)
     for bar, val in zip(ax6_l.patches, prod_rates):
         ax6_l.text(bar.get_x() + bar.get_width() / 2, bar.get_height(),
-                   f"{val:.1f}%", ha="center", va="bottom", fontsize=9)
+                   f"{_sk_fmt(val, 1)}%", ha="center", va="bottom", fontsize=9)
 
     ax6_r.bar(prod_labels, prod_eur, color=["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728"])
     ax6_r.set_ylabel("EUR (tis.)")
-    ax6_r.set_title(f"RA podľa produktov – EUR (percentil {sel_p * 100:.1f}%)")
+    ax6_r.set_title(f"RA podľa produktov – EUR (percentil {_sk_fmt(sel_p * 100, 1)}%)")
     ax6_r.tick_params(axis="x", rotation=15)
     ax6_r.grid(True, axis="y", alpha=0.3)
     for bar, val in zip(ax6_r.patches, prod_eur):
         ax6_r.text(bar.get_x() + bar.get_width() / 2, bar.get_height(),
-                   f"{val:,.1f}", ha="center", va="bottom", fontsize=9)
+                   _sk_fmt(val, 1), ha="center", va="bottom", fontsize=9)
 
     fig6.tight_layout()
     st.pyplot(fig6, use_container_width=False)
@@ -599,7 +608,7 @@ if st.session_state["do_compute"]:
     plt.colorbar(im, ax=ax7, label="Sadzba RA (%)")
     for i in range(len(heatmap_df.index)):
         for j in range(len(p_labels_hm)):
-            ax7.text(j, i, f"{heatmap_df.values[i, j]:.1f}%",
+            ax7.text(j, i, f"{_sk_fmt(heatmap_df.values[i, j], 1)}%",
                      ha="center", va="center", fontsize=8, color="black")
     fig7.tight_layout()
     st.pyplot(fig7, use_container_width=False)

@@ -46,12 +46,12 @@ def check_stressed_probs_in_range(
         CheckResult(
             name="qx po strese v [0,1]",
             passed=qx_ok,
-            details=f"min={qx_min:.6g}, max={qx_max:.6g}",
+            details=f"min={f'{qx_min:.6g}'.replace('.', ',')}; max={f'{qx_max:.6g}'.replace('.', ',')}",
         ),
         CheckResult(
             name="lapse po strese v [0,1]",
             passed=lapse_ok,
-            details=f"min={lapse_min:.6g}, max={lapse_max:.6g}",
+            details=f"min={f'{lapse_min:.6g}'.replace('.', ',')}; max={f'{lapse_max:.6g}'.replace('.', ',')}",
         ),
     ]
 
