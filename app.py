@@ -137,6 +137,11 @@ def _build_assumptions(raw: Dict) -> Assumptions:
         df = np.pad(df, (0, 50 - len(df)), mode="edge")
     df = df[:50]
 
+    fwd = rf["forward_rate"].to_numpy(dtype=float)
+    if len(fwd) < 50:
+        fwd = np.pad(fwd, (0, 50 - len(fwd)), mode="edge")
+    fwd = fwd[:50]
+
     infl = raw["inflation"].copy().sort_values("year")
     idx_base = infl["index_base"].to_numpy(dtype=float)
     idx_st = infl["index_stressed"].to_numpy(dtype=float)
@@ -151,6 +156,7 @@ def _build_assumptions(raw: Dict) -> Assumptions:
         mortality_qx_by_age=mort_map,
         lapse_by_product_duration=lapse_by_prod,
         discount_factors=df,
+        forward_rates=fwd,
         index_base=idx_base,
         index_stressed=idx_st,
         expenses=exp,
@@ -194,6 +200,11 @@ with st.expander("ℹ️ Vysvetlivky skratiek"):
     - **NFR** (Non-Financial Risk / Nefinančné riziko) – rizikový kapitál pre jednotlivé rizikové komponenty (mortalita, storno, náklady, dlhovekosť)
     - **VaR** (Value at Risk) – štatistická miera rizika na danom percentile spoľahlivosti
     - **FCF** (Fulfillment Cash Flows / Peňažné toky na splnenie záväzkov) – súčet BEL a rizikovej prirážky RA; celkový záväzok poisťovne vykazovaný podľa IFRS 17
+    - **Coverage units** (Jednotky krytia) – miera poistnej služby poskytovanej v danom roku; v tejto aplikácii sa počítajú ako poistné sumy vážené podielom preživajúcich zmlúv
+    - **PV** (Present Value / Súčasná hodnota) – hodnota budúcich peňažných tokov alebo veličín diskontovaná na dnešok pomocou bezrizikovej úrokovej miery
+    - **PV CU** (Present Value of Coverage Units) – súčasná hodnota budúcich coverage units diskontovaná forwardovými sadzbami bezrizikovej krivky
+    - **BoP** (Beginning of Period / Začiatok obdobia) – hodnota na začiatku roka
+    - **EoP** (End of Period / Koniec obdobia) – hodnota na konci roka
     """)
 
 port, assumptions, shock_engine, corr, product_map, var_levels = _load_and_prepare()
@@ -284,11 +295,10 @@ if st.session_state["do_compute"]:
         index_stressed=assumptions.index_stressed,
     )
 
-    c1, c2, c3, c4 = st.columns(4)
+    c1, c2, c3 = st.columns(3)
     c1.metric("Riziková úprava z nefinančného rizika - RA (EUR)", _sk_fmt(ra.ra_total, 2))
-    c2.metric("Sadzba RA (%)", _sk_fmt(ra.ra_rate * 100, 4))
-    c3.metric("BEL základný (EUR)", _sk_fmt(ra.bel_base, 2))
-    c4.metric("Peňažné toky na splnenie záväzkov - FCF (EUR)", _sk_fmt(ra.bel_base + ra.ra_total, 2))
+    c2.metric("BEL základný (EUR)", _sk_fmt(ra.bel_base, 2))
+    c3.metric("Peňažné toky na splnenie záväzkov - FCF (EUR)", _sk_fmt(ra.bel_base + ra.ra_total, 2))
     st.subheader("NFR komponenty (portfólio)")
     nfr_names = {
         "mortality": "Mortalita (Mortality)",
@@ -321,69 +331,67 @@ if st.session_state["do_compute"]:
 
     st.subheader("RA po rokoch (rozpustenie)")
 
-
-    def _shift_policies_by_year(policies: List[Policy], shift: int) -> List[Policy]:
-        shifted = []
-        for pol in policies:
-            new_horizon = max(0, pol.horizon - shift)
-            new_remaining_term = max(0, pol.remaining_term - shift) if pol.remaining_term != 9999 else 9999
-            new_age = pol.current_age + shift
-            new_duration = pol.duration + shift
-            new_ppt = max(0, pol.premium_payment_term - shift)
-            shifted.append(Policy(
-                policy_id=pol.policy_id,
-                insurance_type=pol.insurance_type,
-                agreement_state=pol.agreement_state,
-                date_of_birth=pol.date_of_birth,
-                issue_date=pol.issue_date,
-                insurance_term=pol.insurance_term,
-                sum_insured=pol.sum_insured,
-                premium=pol.premium,
-                duration=new_duration,
-                current_age=new_age,
-                remaining_term=new_remaining_term,
-                horizon=new_horizon,
-                premium_payment_term=new_ppt,
-                surrender_value=pol.surrender_value,
-            ))
-        return shifted
-
-    ra_rate_locked = ra.ra_rate
+    from src.cashflows import portfolio_coverage_units
 
     max_horizon = max((p.horizon for p in policies), default=0)
     max_years = min(max_horizon, 50)
 
+    # Coverage units pre každý rok
+    cu = portfolio_coverage_units(policies, assumptions, max_years)
+
+    # Forward rates z bezrizikovej krivky
+    fwd = assumptions.forward_rates[:max_years]
+
+    # PV budúcich coverage units pre každý rok t
+    pv_cu = np.zeros(max_years, dtype=float)
+    for t in range(max_years):
+        pv = 0.0
+        disc = 1.0
+        for s in range(t, max_years):
+            if s > t:
+                disc /= (1.0 + fwd[s])
+            pv += cu[s] * disc
+        pv_cu[t] = pv
+
+    # Amortizačný faktor = CU(t) / PV_CU(t)
+    amort = np.zeros(max_years, dtype=float)
+    for t in range(max_years):
+        amort[t] = (cu[t] / pv_cu[t]) if pv_cu[t] > 1e-12 else 1.0
+
+    # Rozpúšťanie RA cez coverage units
+    ra_bop = np.zeros(max_years, dtype=float)
+    ra_release = np.zeros(max_years, dtype=float)
+    ra_eop = np.zeros(max_years, dtype=float)
+
+    ra_bop[0] = ra.ra_total
+    for t in range(max_years):
+        ra_release[t] = amort[t] * ra_bop[t]
+        ra_eop[t] = ra_bop[t] - ra_release[t]
+        if t + 1 < max_years:
+            ra_bop[t + 1] = ra_eop[t]
+
     rows = []
-    from src.cashflows import portfolio_bel as _pbel, Scenario as _Scenario
-
-    for t in range(max_years + 1):
-        if t == 0:
-            bel_t = ra.bel_base
-        else:
-            shifted = _shift_policies_by_year(policies, t)
-            bel_t = float(_pbel(shifted, assumptions, _Scenario())["bel"])
-
-        ra_t = ra_rate_locked * bel_t if abs(bel_t) > 1e-6 else 0.0
+    for t in range(max_years):
         rows.append({
-            "Rok": t,
-            "BEL (EUR)": bel_t,
-            "Sadzba RA (%)": ra_rate_locked * 100,
-            "RA na začiatku roka (EUR)": ra_t,
+            "Rok": t + 1,
+            "Poistná suma – Coverage units (EUR)": cu[t],
+            "PV poistnej sumy – PV CU (EUR)": pv_cu[t],
+            "Amortizačný faktor (%)": amort[t] * 100,
+            "RA BoP (EUR)": ra_bop[t],
+            "Rozpustenie RA (EUR)": ra_release[t],
+            "RA EoP (EUR)": ra_eop[t],
         })
 
     ra_schedule_df = pd.DataFrame(rows)
 
-    ra_schedule_df["RA release (EUR)"] = (
-            ra_schedule_df["RA na začiatku roka (EUR)"].shift(1) - ra_schedule_df["RA na začiatku roka (EUR)"]
-    )
-    ra_schedule_df.loc[0, "RA release (EUR)"] = 0.0
-
     st.dataframe(
         ra_schedule_df.style.format({
-            "BEL (EUR)": lambda x: _sk_fmt(x, 2),
-            "Sadzba RA (%)": lambda x: _sk_fmt(x, 4),
-            "RA na začiatku roka (EUR)": lambda x: _sk_fmt(x, 2),
-            "RA release (EUR)": lambda x: _sk_fmt(x, 2),
+            "Poistná suma – Coverage units (EUR)": lambda x: _sk_fmt(x, 0),
+            "PV poistnej sumy – PV CU (EUR)": lambda x: _sk_fmt(x, 0),
+            "Amortizačný faktor (%)": lambda x: _sk_fmt(x, 4),
+            "RA BoP (EUR)": lambda x: _sk_fmt(x, 2),
+            "Rozpustenie RA (EUR)": lambda x: _sk_fmt(x, 2),
+            "RA EoP (EUR)": lambda x: _sk_fmt(x, 2),
         }),
         width="stretch",
         hide_index=True,
@@ -419,14 +427,14 @@ if st.session_state["do_compute"]:
     # --- Graf 1: BEL a RA po rokoch ---
     fig1, (ax1_l, ax1_r) = plt.subplots(1, 2, figsize=(10, 3))
 
-    ax1_l.plot(ra_schedule_df["Rok"], ra_schedule_df["BEL (EUR)"] / 1e3,
+    ax1_l.plot(ra_schedule_df["Rok"], ra_schedule_df["Poistná suma – Coverage units (EUR)"] / 1e6,
                color="#1f77b4", linewidth=2)
     ax1_l.set_xlabel("Rok")
-    ax1_l.set_ylabel("EUR (tis.)")
-    ax1_l.set_title("BEL základný po rokoch")
+    ax1_l.set_ylabel("EUR (mil.)")
+    ax1_l.set_title("Poistná suma (Coverage units) po rokoch")
     ax1_l.grid(True, alpha=0.3)
 
-    ax1_r.plot(ra_schedule_df["Rok"], ra_schedule_df["RA na začiatku roka (EUR)"] / 1e3,
+    ax1_r.plot(ra_schedule_df["Rok"], ra_schedule_df["RA BoP (EUR)"] / 1e3,
                color="#ff7f0e", linewidth=2, linestyle="--")
     ax1_r.set_xlabel("Rok")
     ax1_r.set_ylabel("EUR (tis.)")
@@ -460,8 +468,8 @@ if st.session_state["do_compute"]:
     # --- Graf 3: RA release po rokoch ---
     release_plot = ra_schedule_df[ra_schedule_df["Rok"] > 0].copy()
     fig3, ax3 = plt.subplots(figsize=(4, 2.5))
-    colors = ["#2ca02c" if v >= 0 else "#d62728" for v in release_plot["RA release (EUR)"]]
-    ax3.bar(release_plot["Rok"], release_plot["RA release (EUR)"] / 1e3, color=colors)
+    colors = ["#2ca02c" if v >= 0 else "#d62728" for v in release_plot["Rozpustenie RA (EUR)"]]
+    ax3.bar(release_plot["Rok"], release_plot["Rozpustenie RA (EUR)"] / 1e3, color=colors)
     ax3.set_xlabel("Rok")
     ax3.set_ylabel("EUR (tis.)")
     ax3.set_title("RA release po rokoch")
@@ -657,7 +665,8 @@ if st.session_state["do_compute"]:
 
     ra_schedule_export = ra_schedule_df.copy()
     ra_schedule_export.columns = [
-        "Rok", "BEL (EUR)", "Sadzba RA (%)", "RA na začiatku roka (EUR)", "RA release (EUR)"
+        "Rok", "Poistná suma – Coverage units (EUR)", "PV poistnej sumy – PV CU (EUR)", "Amortizačný faktor (%)",
+        "RA BoP (EUR)", "Rozpustenie RA (EUR)", "RA EoP (EUR)"
     ]
 
     st.download_button(

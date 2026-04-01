@@ -12,6 +12,7 @@ class Assumptions:
     mortality_qx_by_age: Dict[int, float]
     lapse_by_product_duration: Dict[str, np.ndarray]
     discount_factors: np.ndarray
+    forward_rates: np.ndarray
     index_base: np.ndarray
     index_stressed: np.ndarray
     expenses: Dict[str, Any]
@@ -172,3 +173,33 @@ def portfolio_bel(policies, a: Assumptions, s: Scenario) -> Dict[str, float]:
         pv_out += r["pv_outflows"]
         bel += r["bel"]
     return {"pv_inflows": float(pv_in), "pv_outflows": float(pv_out), "bel": float(bel)}
+
+def portfolio_coverage_units(policies, a: Assumptions, max_years: int) -> np.ndarray:
+    """Coverage units pre roky 1..max_years.
+    CU(t) = suma (sum_insured * S_bop(t)) cez všetky zmluvy,
+    kde S_bop(t) je podiel preživajúcich na začiatku roka t
+    (po dekrementoch za predchádzajúce roky).
+    """
+    cu = np.zeros(max_years, dtype=float)
+    for pol in policies:
+        T = min(int(pol.horizon), max_years)
+        if T <= 0:
+            continue
+        S = 1.0
+        product = pol.insurance_type
+        for t in range(1, T + 1):
+            cu[t - 1] += pol.sum_insured * S
+            age = int(pol.current_age + (t - 1))
+            qx = _qx_for_age(a.mortality_qx_by_age, age)
+            qx = clamp(qx, 0.0, 1.0)
+            dur = int(pol.duration + t)
+            lapse = _lapse_for_duration(a.lapse_by_product_duration, product, dur)
+            lapse = clamp(lapse, 0.0, 1.0)
+            deaths = S * qx
+            lapses = (S - deaths) * lapse
+            S = S - deaths - lapses
+            if S < 0.0:
+                S = 0.0
+            if S <= 1e-12:
+                break
+    return cu
