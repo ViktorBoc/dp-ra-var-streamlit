@@ -12,13 +12,15 @@ Používateľ vyberie:
 
 Appka vypočíta pre portfólio všetkých zmlúv daného typu (len aktívne stavy):
 
-- **BEL základný (EUR)** = PV(outflows) − PV(inflows)
-- **Riziková prirážka RA (EUR)** = agregované NFR komponenty cez korelačnú maticu
-- **Sadzba RA (%)** = RA_total / BEL_base
+**BEL základný (EUR)** = súčasná hodnota peňažných výdavkov − súčasná hodnota peňažných príjmov
+- **Riziková úprava RA (EUR)** = agregované NFR komponenty cez korelačnú maticu
 - **Peňažné toky na splnenie záväzkov – FCF (EUR)** = BEL_base + RA_total (IFRS 17 záväzok)
+- **Súhrnná tabuľka**: typ poistenia, percentil, počet zmlúv celkom (z toho `new` / `paid_up`), priemerný vek poisteného, priemerná poistná suma alebo ročná renta, priemerné ročné poistné, súčasná hodnota peňažných príjmov a výdavkov, BEL, RA, FCF
+- **Tabuľka RA podľa percentilov**: RA (EUR), BEL a FCF pre všetky percentily pri vybranom produkte; tabuľka obsahuje aj kľúčové charakteristiky portfólia (počet zmlúv, z toho `new` / `paid_up`, priemerný vek, priemerná poistná suma / renta, priemerné ročné poistné)
+- **Tabuľka RA podľa produktov**: RA (EUR), BEL a FCF pre všetky produkty pri vybranom percentile; pre každý produkt zahŕňa počet zmlúv (z toho `new` / `paid_up`), priemerný vek poisteného, priemernú poistnú sumu alebo ročnú rentu a priemerné ročné poistné
 - **NFR komponenty (EUR)**: `mortality`, `longevity`, `lapse`, `expense` vrátane BEL šokovaného pre každý komponent
-- **RA po rokoch** = tabuľka rozpustenia RA počas trvania portfólia
-- **Grafy**: BEL a RA po rokoch (dvojgraf), NFR komponenty, RA release po rokoch, BEL základný vs šokovaný, RA podľa percentilov (EUR aj sadzba), porovnanie RA sadzby naprieč produktmi, heatmapa RA sadzby produkty × percentily
+- **RA po rokoch** = tabuľka rozpustenia RA počas trvania portfólia; stĺpce: `Rok`, `Poistná suma – Coverage units (EUR)`, `PV poistnej sumy – PV CU (EUR)`, `Amortizačný faktor (%)`, `RA BoP (EUR)`, `Rozpustenie RA (EUR)`, `RA EoP (EUR)` – podrobný popis výpočtu v sekcii [RA po rokoch](#ra-po-rokoch-rozpustenie-cez-coverage-units)
+- **Grafy**: Coverage units po rokoch, RA BoP po rokoch, NFR komponenty, rozpustenie RA po rokoch, amortizačný faktor po rokoch, RA podľa percentilov (EUR), RA podľa produktov (EUR), heatmapa RA (EUR tis.) produkty × percentily; každý graf obsahuje rozbaľovací popis s informáciou o type, produkte a percentile
 - **Kontrola konzistencie** (OK/CHYBA)
 
 Export:
@@ -50,7 +52,7 @@ Export:
 - každá zmluva má `premium_payment_term` – počet rokov platenia poistného
 - v kóde sa ošetruje: `ppt = min(premium_payment_term, insurance_term)` – klient nemôže platiť dlhšie ako trvá zmluva
 - `remaining_ppt = max(0, ppt - duration)` – zostatok doby platenia k dátumu ocenenia
-- inflow (poistné) sa zastaví po uplynutí `remaining_ppt` rokov projekcie
+- peňažné príjmy (poistné) sa zastavia po uplynutí `remaining_ppt` rokov projekcie
 
 ### Surrender Value (odkupná hodnota)
 - pri každom storne (lapse) sa vypláca odkupná hodnota klientovi
@@ -69,12 +71,12 @@ Export:
   - v expense strese: percentilový geometrický blend medzi base a stressed indexom
 
 ### Paid-up a Annuity
-- `paid_up`: zmluva stále aktívna a vstupuje do výpočtu, avšak inflows (ročné poistné) sú vždy nulové – klient už zaplatil poistné vopred
-- `annuity`: `annual_payment = sum_insured` (sum_insured je ročná renta), premium inflow sa počíta rovnako ako pre ostatné produkty (počas premium_payment_term, nulové pre paid_up zmluvy)
+- `paid_up`: zmluva stále aktívna a vstupuje do výpočtu, avšak peňažné príjmy (ročné poistné) sú vždy nulové – klient už zaplatil poistné vopred
+- `annuity`: `annual_payment = sum_insured` (sum_insured je ročná renta), peňažné príjmy z poistného sa počítajú rovnako ako pre ostatné produkty (počas premium_payment_term, nulové pre paid_up zmluvy)
 
 ### Produkty (cash-flow)
 
-| Produkt | Inflows | Outflows |
+| Produkt | Peňažné príjmy (Inflows) | Peňažné výdavky (Outflows) |
 |---|---|---|
 | `term_insurance` | poistné (počas premium_payment_term) | death benefit + surrender value pri lapse + náklady |
 | `whole_of_life` | poistné (počas premium_payment_term) | death benefit + surrender value pri lapse + náklady |
@@ -82,22 +84,24 @@ Export:
 | `annuity` | poistné (počas premium_payment_term) | ročné dôchodkové platby + náklady |
 
 ### BEL definícia
-- **BEL = PV(outflows) − PV(inflows)** (liability)
+**BEL = súčasná hodnota peňažných výdavkov − súčasná hodnota peňažných príjmov** (liability)
 - kladný BEL = poisťovňa viac vyplatí ako dostane (štandardné)
 - záporný BEL = portfólio je ziskové (možné pri term_insurance s vysokým poistným)
 
 ### NFR a RA (VaR)
 - pre komponent `i`: `NFR_i = max(0, BEL_stress_i − BEL_base)`
 - agregácia cez variance-covariance: `RA_total = sqrt(v^T * Corr * v)`
-- `RA_rate = RA_total / BEL_base`
 - **FCF = BEL_base + RA_total** (celkový záväzok podľa IFRS 17)
 
-### RA po rokoch (rozpustenie)
-- `RA_rate` je **konštantná** – vypočítaná raz pri rok 0 (initial recognition)
-- `BEL_rok_t` sa prepočítava každý rok posunutím horizontu portfólia o t rokov
-- `RA_rok_t = RA_rate * BEL_rok_t` – RA klesá spolu s BEL
-- `RA_release_t = RA_rok_{t-1} - RA_rok_t` – ročné rozpustenie RA do výsledovky
-- súčet všetkých RA_release sa rovná RA_total v roku 0
+### RA po rokoch (rozpustenie cez coverage units)
+- Rozpúšťanie RA je podľa IFRS 17 (odseky 44 a B119) riadené **coverage units** (jednotkami krytia) a **amortizačným faktorom**
+- **Coverage units (CU)**: poistné sumy vážené podielom preživajúcich zmlúv na začiatku roka: `CU(t) = Σ (sum_insured × S_bop(t))`
+- **Súčasná hodnota coverage units (PV CU)**: budúce CU diskontované **forwardovými sadzbami** z bezrizikovej krivky EIOPA: `PV_CU(t) = Σ CU(s) / Π(1 + f(k))` pre s ≥ t
+- **Amortizačný faktor**: `AF(t) = CU(t) / PV_CU(t)` – podiel služby poskytnutej v roku t z celkovej zostávajúcej služby
+- **Rozpustenie RA**: `RA_release(t) = AF(t) × RA_BoP(t)`, kde `RA_BoP(1) = RA_total`
+- **RA EoP**: `RA_EoP(t) = RA_BoP(t) − RA_release(t)` a `RA_BoP(t+1) = RA_EoP(t)`
+- Súčet všetkých `RA_release` sa rovná `RA_total`
+- V poslednom roku je amortizačný faktor 100 % a celý zostatok RA sa rozpustí
 
 ---
 
@@ -202,6 +206,8 @@ Bezriziková úroková krivka pre EUR, stĺpce `year`, `spot_rate`, `forward_rat
 Discount factor vypočítaný ako: `df(t) = 1 / (1 + spot_rate(t))^t`
 
 Forward rate vypočítaný ako: `f(t) = (1 + spot(t))^t / (1 + spot(t-1))^(t-1) - 1`
+
+Forward rates sa používajú pri diskontovaní coverage units pre rozpúšťanie RA.
 
 ### `data/assumptions/inflation_curve_base_and_stressed_ecb.csv`
 Krivka inflácie pre roky 1–50, stĺpce `year`, `index_base`, `index_stressed`. Zdroj: **ECB (Európska centrálna banka)** – strednodobé inflačné projekcie pre eurozónu. Base scenár: inflácia 1.9–2.0% ročne smerom k cieľu 2%. Stresovaný scenár: inflácia o 1 percentuálny bod vyššia (stress addon = +1%). Index je kumulatívny (rok 1 = 1.019 pre base).
