@@ -169,6 +169,25 @@ def _build_assumptions(raw: Dict) -> Assumptions:
         fwd = np.pad(fwd, (0, 50 - len(fwd)), mode="edge")
     fwd = fwd[:50]
 
+    # Prémia za nelikviditu (Illiquidity Premium), bottom-up, +0,5 % k bezrizikovej spotovej sadzbe
+    ILLIQUIDITY_PREMIUM = 0.005
+    spot_illiquid = rf["spot_rate"].to_numpy(dtype=float) + ILLIQUIDITY_PREMIUM
+    years = np.arange(1, len(spot_illiquid) + 1, dtype=float)
+    df_illiquid = 1.0 / (1.0 + spot_illiquid) ** years
+    if len(df_illiquid) < 50:
+        df_illiquid = np.pad(df_illiquid, (0, 50 - len(df_illiquid)), mode="edge")
+    df_illiquid = df_illiquid[:50]
+
+    fwd_illiquid = np.empty(len(spot_illiquid), dtype=float)
+    fwd_illiquid[0] = spot_illiquid[0]
+    for i in range(1, len(spot_illiquid)):
+        fwd_illiquid[i] = (
+                                  (1.0 + spot_illiquid[i]) ** (i + 1) / (1.0 + spot_illiquid[i - 1]) ** i
+                          ) - 1.0
+    if len(fwd_illiquid) < 50:
+        fwd_illiquid = np.pad(fwd_illiquid, (0, 50 - len(fwd_illiquid)), mode="edge")
+    fwd_illiquid = fwd_illiquid[:50]
+
     infl = raw["inflation"].copy().sort_values("year")
     idx_base = infl["index_base"].to_numpy(dtype=float)
     idx_st = infl["index_stressed"].to_numpy(dtype=float)
@@ -184,6 +203,8 @@ def _build_assumptions(raw: Dict) -> Assumptions:
         lapse_by_product_duration=lapse_by_prod,
         discount_factors=df,
         forward_rates=fwd,
+        discount_factors_illiquid=df_illiquid,
+        forward_rates_illiquid=fwd_illiquid,
         index_base=idx_base,
         index_stressed=idx_st,
         expenses=exp,
@@ -382,8 +403,11 @@ if st.session_state["do_compute"]:
     # Coverage units pre každý rok
     cu = portfolio_coverage_units(policies, assumptions, max_years)
 
-    # Forward rates z bezrizikovej krivky
-    fwd = assumptions.forward_rates[:max_years]
+    # Forward rates: nelikvidné produkty (endowment, annuity) používajú krivku s IP
+    if sel_type in ("endowment", "annuity"):
+        fwd = assumptions.forward_rates_illiquid[:max_years]
+    else:
+        fwd = assumptions.forward_rates[:max_years]
 
     # PV budúcich coverage units pre každý rok t
     pv_cu = np.zeros(max_years, dtype=float)

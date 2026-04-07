@@ -7,12 +7,19 @@ import numpy as np
 
 from .utils import Policy, clamp
 
+# Produkty, pre ktoré sa aplikuje prémia za nelikviditu (Illiquidity Premium) (bottom-up, +0,5 %)
+ILLIQUID_PRODUCTS: frozenset = frozenset({"endowment", "annuity"})
+
 @dataclass(frozen=True)
 class Assumptions:
     mortality_qx_by_age: Dict[int, float]
     lapse_by_product_duration: Dict[str, np.ndarray]
     discount_factors: np.ndarray
     forward_rates: np.ndarray
+    # Diskontné faktory a forwardové sadzby upravené o prémiu za nelikviditu (+0,5 %)
+    # Používajú sa pre produkty endowment a annuity
+    discount_factors_illiquid: np.ndarray
+    forward_rates_illiquid: np.ndarray
     index_base: np.ndarray
     index_stressed: np.ndarray
     expenses: Dict[str, Any]
@@ -71,7 +78,11 @@ def project_policy_bel(policy: Policy, a: Assumptions, s: Scenario) -> Dict[str,
     if T <= 0:
         return {"pv_inflows": 0.0, "pv_outflows": 0.0, "bel": 0.0}
 
-    df = a.discount_factors[:T]
+    # Pre nelikvidné produkty (endowment, annuity) sa použije krivka s prémiou za nelikviditu
+    if policy.insurance_type in ILLIQUID_PRODUCTS:
+        df = a.discount_factors_illiquid[:T]
+    else:
+        df = a.discount_factors[:T]
     infl = (s.inflation_index if s.inflation_index is not None else a.index_base)[:T]
     lapse_stressed = s.lapse_rates
 

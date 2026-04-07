@@ -65,7 +65,9 @@ Export:
 - pre annuity je síce v dátach nenulová ale v praxi sa nevypláca keďže annuity nemá lapse rates
 
 ### Diskontovanie a inflácia
-- benefity aj náklady sa diskontujú pomocou diskontných faktorov z `risk_free_curve.csv`
+- benefity aj náklady sa diskontujú pomocou diskontných faktorov odvodených z `risk_free_curve.csv`
+- pre produkty `endowment` a `annuity` sa aplikuje **prémia za nelikviditu +0,5 %** (Illiquidity Premium) – diskontná sadzba sa navyšuje o 50 bázických bodov podľa princípu bottom-up (IFRS 17, odseky B72–B85); tieto produkty sú klasifikované ako `ILLIQUID_PRODUCTS` v `cashflows.py`
+- pre produkty `term_insurance` a `whole_of_life` sa používa štandardná bezriziková krivka EIOPA bez úpravy
 - náklady sa valorizujú infláciou:
   - base: `index_base`
   - v expense strese: percentilový geometrický blend medzi base a stressed indexom
@@ -96,7 +98,7 @@ Export:
 ### RA po rokoch (rozpustenie cez coverage units)
 - Rozpúšťanie RA je podľa IFRS 17 (odseky 44 a B119) riadené **coverage units** (jednotkami krytia) a **amortizačným faktorom**
 - **Coverage units (CU)**: poistné sumy vážené podielom preživajúcich zmlúv na začiatku roka: `CU(t) = Σ (sum_insured × S_bop(t))`
-- **Súčasná hodnota coverage units (PV CU)**: budúce CU diskontované **forwardovými sadzbami** z bezrizikovej krivky EIOPA: `PV_CU(t) = Σ CU(s) / Π(1 + f(k))` pre s ≥ t
+- **Súčasná hodnota coverage units (PV CU)**: budúce CU diskontované **forwardovými sadzbami** – pre `endowment` a `annuity` sa použijú forwardové sadzby z krivky upravenej o prémiu za nelikviditu +0,5 %, pre ostatné produkty štandardná krivka EIOPA: `PV_CU(t) = Σ CU(s) / Π(1 + f(k))` pre s ≥ t
 - **Amortizačný faktor**: `AF(t) = CU(t) / PV_CU(t)` – podiel služby poskytnutej v roku t z celkovej zostávajúcej služby
 - **Rozpustenie RA**: `RA_release(t) = AF(t) × RA_BoP(t)`, kde `RA_BoP(1) = RA_total`
 - **RA EoP**: `RA_EoP(t) = RA_BoP(t) − RA_release(t)` a `RA_BoP(t+1) = RA_EoP(t)`
@@ -208,6 +210,15 @@ Discount factor vypočítaný ako: `df(t) = 1 / (1 + spot_rate(t))^t`
 Forward rate vypočítaný ako: `f(t) = (1 + spot(t))^t / (1 + spot(t-1))^(t-1) - 1`
 
 Forward rates sa používajú pri diskontovaní coverage units pre rozpúšťanie RA.
+
+### Prémia za nelikviditu (Illiquidity Premium)
+Pre produkty `endowment` a `annuity` sa bezriziková spotová krivka navyšuje o **0,5 %** (50 bázických bodov) podľa metodológie bottom-up (IFRS 17, odseky B72–B85). Upravené krivky sa vypočítajú v `app.py` vo funkcii `_build_assumptions` pomocou konštanty `ILLIQUIDITY_PREMIUM = 0.005`:
+
+- `spot_illiquid(t) = spot_rate(t) + 0.005`
+- `discount_factors_illiquid(t) = 1 / (1 + spot_illiquid(t))^t`
+- `forward_rates_illiquid(t) = (1 + spot_illiquid(t))^t / (1 + spot_illiquid(t-1))^(t-1) - 1`
+
+Obe upravené krivky sú uložené ako samostatné polia `discount_factors_illiquid` a `forward_rates_illiquid` v objekte `Assumptions` (`cashflows.py`). Výber správnej krivky prebieha automaticky na základe `policy.insurance_type` v `project_policy_bel` (pre BEL) a v `app.py` (pre PV CU pri rozpúšťaní RA). Pre `term_insurance` a `whole_of_life` sa naďalej používa pôvodná krivka EIOPA bez úpravy.
 
 ### `data/assumptions/inflation_curve_base_and_stressed_ecb.csv`
 Krivka inflácie pre roky 1–50, stĺpce `year`, `index_base`, `index_stressed`. Zdroj: **ECB (Európska centrálna banka)** – strednodobé inflačné projekcie pre eurozónu. Base scenár: inflácia 1.9–2.0% ročne smerom k cieľu 2%. Stresovaný scenár: inflácia o 1 percentuálny bod vyššia (stress addon = +1%). Index je kumulatívny (rok 1 = 1.019 pre base).
