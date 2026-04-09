@@ -1,7 +1,7 @@
 schema_version: '1.0'
 products:
   term_insurance:
-    sk_name: Rizikové životné poistenie
+    sk_name: Poistenie pre prípad smrti
     components:
     - mortality
     - lapse
@@ -13,7 +13,7 @@ products:
     - lapse
     - expense
   endowment:
-    sk_name: Kapitálové životné poistenie
+    sk_name: Zmiešané poistenie
     components:
     - mortality
     - longevity
