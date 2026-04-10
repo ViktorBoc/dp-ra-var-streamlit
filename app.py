@@ -37,24 +37,51 @@ def _sk_fmt(x, decimals=2):
     s = f"{abs(x):,.{decimals}f}".replace(",", "\u00a0").replace(".", ",")
     return f"-{s}" if x < 0 else s
 
-def _table_to_png(df, title=""):
+def _table_to_png(df, title="", col_wrap=13):
+    import textwrap
     import matplotlib.pyplot as plt
-    fig, ax = plt.subplots(figsize=(10, 0.5 + len(df) * 0.4))
+
+    FONTSIZE      = 11
+    ROW_H         = 0.10
+    HEADER_H_LINE = 0.11
+
+    wrapped_cols = ["\n".join(textwrap.wrap(str(c), width=col_wrap)) for c in df.columns]
+    max_header_lines = max(c.count("\n") + 1 for c in wrapped_cols)
+    header_h = HEADER_H_LINE * max_header_lines
+
+    n_rows = len(df)
+    n_cols = len(df.columns)
+
+    fig_h = max(3.0, (n_rows * ROW_H + header_h) * 10 + 1.0)
+    fig_w = max(16, n_cols * 1.8)
+
+    fig, ax = plt.subplots(figsize=(fig_w, fig_h))
     ax.axis("off")
     if title:
-        ax.set_title(title, fontsize=12, fontweight="bold", loc="left", pad=10)
-    tbl = ax.table(cellText=df.values, colLabels=df.columns, loc="center", cellLoc="left")
+        ax.set_title(title, fontsize=FONTSIZE + 1, fontweight="bold", loc="left", pad=10)
+
+    tbl = ax.table(
+        cellText=df.values,
+        colLabels=wrapped_cols,
+        loc="center",
+        cellLoc="left",
+    )
     tbl.auto_set_font_size(False)
-    tbl.set_fontsize(9)
-    tbl.scale(1, 1.4)
+    tbl.set_fontsize(FONTSIZE)
+
     for (row, col), cell in tbl.get_celld().items():
         if row == 0:
-            cell.set_facecolor("#e6e6e6")
+            cell.set_facecolor("#d9e1f2")
             cell.set_text_props(fontweight="bold")
+            cell.set_height(header_h)
         else:
-            cell.set_facecolor("white")
-        cell.set_edgecolor("#cccccc")
-    fig.tight_layout()
+            cell.set_facecolor("#ffffff" if row % 2 == 1 else "#f5f7fb")
+            cell.set_height(ROW_H)
+        cell.set_edgecolor("#c0c8d8")
+        cell.PAD = 0.06
+
+    tbl.auto_set_column_width(col=list(range(n_cols)))
+    fig.tight_layout(pad=0.5)
     return fig
 
 def _fig_to_download(fig):
@@ -323,8 +350,9 @@ if len(port_preview) > 0:
         "Hodnota": f"{_sk_fmt(avg_sum, 0)} EUR"},
         {"Ukazovateľ": "Priemerné ročné poistné", "Hodnota": f"{_sk_fmt(avg_prem, 0)} EUR"},
     ])
+    st.markdown("**Súhrn portfólia**")
     st.dataframe(summary_df, hide_index=True, width="stretch")
-    _fig_port = _table_to_png(summary_df, "Súhrn portfólia")
+    _fig_port = _table_to_png(summary_df)
     st.download_button("Stiahnuť tabuľku: Súhrn portfólia", _fig_to_download(_fig_port),
                        file_name="tab_suhrn_portfolia.png", mime="image/png", key="dl_tab_portfolio")
     import matplotlib.pyplot as plt
@@ -386,7 +414,7 @@ if st.session_state["do_compute"]:
     _scr_display["BEL šokovaný (EUR)"] = _scr_display["BEL šokovaný (EUR)"].apply(
         lambda x: _sk_fmt(x, 2) if isinstance(x, (int, float)) else x)
     _scr_display["NFR"] = _scr_display["NFR"].apply(lambda x: _sk_fmt(x, 2))
-    _fig_nfr = _table_to_png(_scr_display, "NFR komponenty (portfólio)")
+    _fig_nfr = _table_to_png(_scr_display)
     st.download_button("Stiahnuť tabuľku: NFR komponenty", _fig_to_download(_fig_nfr),
                        file_name="tab_nfr_komponenty.png", mime="image/png", key="dl_tab_nfr")
     plt.close(_fig_nfr)
@@ -463,16 +491,6 @@ if st.session_state["do_compute"]:
         width="stretch",
         hide_index=True,
     )
-    _ra_sch_display = ra_schedule_df.copy()
-    for col in ["Poistná suma – Coverage units (EUR)", "PV poistnej sumy – PV CU (EUR)"]:
-        _ra_sch_display[col] = _ra_sch_display[col].apply(lambda x: _sk_fmt(x, 0))
-    _ra_sch_display["Amortizačný faktor (%)"] = _ra_sch_display["Amortizačný faktor (%)"].apply(lambda x: _sk_fmt(x, 2))
-    for col in ["RA BoP (EUR)", "Rozpustenie RA (EUR)", "RA EoP (EUR)"]:
-        _ra_sch_display[col] = _ra_sch_display[col].apply(lambda x: _sk_fmt(x, 2))
-    _fig_rasch = _table_to_png(_ra_sch_display, "RA po rokoch (rozpustenie)")
-    st.download_button("Stiahnuť tabuľku: RA po rokoch", _fig_to_download(_fig_rasch),
-                       file_name="tab_ra_po_rokoch.png", mime="image/png", key="dl_tab_ra_roky")
-    plt.close(_fig_rasch)
 
     st.markdown("<br>", unsafe_allow_html=True)
     st.subheader("Grafy a tabuľky")
@@ -512,7 +530,7 @@ if st.session_state["do_compute"]:
     ])
     st.dataframe(summary_results, hide_index=True, width="stretch")
 
-    _fig_sr = _table_to_png(summary_results, "Súhrnné výsledky")
+    _fig_sr = _table_to_png(summary_results)
     st.download_button("Stiahnuť tabuľku: Súhrnné výsledky", _fig_to_download(_fig_sr),
                        file_name="tab_suhrnne_vysledky.png", mime="image/png", key="dl_tab_suhrn")
     with st.expander("ℹ️ Popis tabuľky"):
@@ -718,7 +736,7 @@ if st.session_state["do_compute"]:
     for col in ["RA (EUR)", "BEL základný (EUR)", "FCF (EUR)"]:
         _perc_display[col] = _perc_display[col].apply(
             lambda x: _sk_fmt(x, 2) if isinstance(x, (int, float)) else x)
-    _fig_perc = _table_to_png(_perc_display, "RA podľa percentilov")
+    _fig_perc = _table_to_png(_perc_display)
     st.download_button("Stiahnuť tabuľku: RA podľa percentilov", _fig_to_download(_fig_perc),
                        file_name="tab_ra_percentily.png", mime="image/png", key="dl_tab_ra_perc")
     with st.expander("ℹ️ Popis tabuľky"):
@@ -772,7 +790,6 @@ if st.session_state["do_compute"]:
     plt.close(fig6)
 
     st.markdown("<br>", unsafe_allow_html=True)
-    st.markdown("**RA podľa produktov**")
     ra_prod_table_rows = []
     for prod, ra_eur in ra_by_product:
         port_p = port[port["insurance_type"] == prod]
@@ -810,6 +827,7 @@ if st.session_state["do_compute"]:
             "FCF (EUR)": ra_prod_full.bel_base + ra_eur * 1e3,
         })
     ra_prod_table = pd.DataFrame(ra_prod_table_rows)
+    st.markdown("**RA podľa produktov**")
     st.dataframe(
         ra_prod_table.style.format({
             "BEL základný (EUR)": lambda x: _sk_fmt(x, 2),
@@ -821,9 +839,14 @@ if st.session_state["do_compute"]:
     _prod_display = ra_prod_table.copy()
     for col in ["BEL základný (EUR)", "RA (EUR)", "FCF (EUR)"]:
         _prod_display[col] = _prod_display[col].apply(lambda x: _sk_fmt(x, 2))
-    _fig_prod = _table_to_png(_prod_display, "RA podľa produktov")
-    st.download_button("Stiahnuť tabuľku: RA podľa produktov", _fig_to_download(_fig_prod),
-                       file_name="tab_ra_produkty.png", mime="image/png", key="dl_tab_ra_prod")
+    _fig_prod = _table_to_png(_prod_display)
+    st.download_button(
+        "Stiahnuť tabuľku ako PNG",
+        _fig_to_download(_fig_prod),
+        file_name="tab_ra_produkty.png",
+        mime="image/png",
+        key="dl_tab_ra_prod_png",
+    )
     with st.expander("ℹ️ Popis tabuľky"):
         st.markdown(
             f"**Tabuľka:** RA podľa produktov  \n**Produkt:** všetky  \n**Percentil:** {_sk_fmt(sel_p * 100, 1)}%  \n**Popis:** Porovnanie rizikovej úpravy RA, BEL a FCF naprieč všetkými typmi poistenia pri vybranom percentile spoľahlivosti VaR. Zahŕňa štruktúru portfólia (new / paid_up) a priemerné charakteristiky zmlúv.")
