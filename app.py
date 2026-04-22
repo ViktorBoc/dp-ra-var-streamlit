@@ -597,7 +597,7 @@ if st.session_state["do_compute"]:
     st.markdown("<br>", unsafe_allow_html=True)
     # --- Graf: NFR komponenty ---
     nfr_plot = scr_df[scr_df["Komponent"] != "CELKOM (agregované)"].copy()
-    fig2, ax2 = plt.subplots(figsize=(6, 4.5))
+    fig2, ax2 = plt.subplots(figsize=(5, 3.5))
     bars = ax2.bar(nfr_plot["Komponent"], nfr_plot["NFR"] / 1e3,
                    color=["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728"])
     ax2.set_ylabel("EUR (tis.)")
