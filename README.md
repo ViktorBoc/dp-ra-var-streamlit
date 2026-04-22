@@ -19,8 +19,8 @@ Appka vypočíta pre portfólio všetkých zmlúv daného typu (len aktívne sta
 - **Tabuľka RA podľa percentilov**: RA (EUR), BEL a FCF pre všetky percentily pri vybranom produkte; tabuľka obsahuje aj kľúčové charakteristiky portfólia (počet zmlúv, z toho `new` / `paid_up`, priemerný vek, priemerná poistná suma / renta, priemerné ročné poistné)
 - **Tabuľka RA podľa produktov**: RA (EUR), BEL a FCF pre všetky produkty pri vybranom percentile; pre každý produkt zahŕňa počet zmlúv (z toho `new` / `paid_up`), priemerný vek poisteného, priemernú poistnú sumu alebo ročnú rentu a priemerné ročné poistné
 - **NFR komponenty (EUR)**: `mortality`, `longevity`, `lapse`, `expense` vrátane BEL šokovaného pre každý komponent
-- **RA po rokoch** = tabuľka rozpustenia RA počas trvania portfólia; stĺpce: `Rok`, `Poistná suma – Coverage units (EUR)`, `PV poistnej sumy – PV CU (EUR)`, `Amortizačný faktor (%)`, `RA BoP (EUR)`, `Rozpustenie RA (EUR)`, `RA EoP (EUR)` – podrobný popis výpočtu v sekcii [RA po rokoch](#ra-po-rokoch-rozpustenie-cez-coverage-units)
-- **Grafy**: Coverage units po rokoch, RA BoP po rokoch, NFR komponenty, rozpustenie RA po rokoch, amortizačný faktor po rokoch, RA podľa percentilov (EUR), RA podľa produktov (EUR), heatmapa RA (EUR tis.) produkty × percentily; každý graf obsahuje rozbaľovací popis s informáciou o type, produkte a percentile
+- **RA po rokoch** = tabuľka rozpustenia RA počas trvania portfólia; stĺpce: `Rok`, `Jednotky poistného krytia – CU (EUR)`, `Súčasná hodnota jednotiek poistného krytia – PV CU (EUR)`, `Amortizačný faktor (%)`, `RA BoP (EUR)`, `Rozpustenie RA (EUR)`, `RA EoP (EUR)` – podrobný popis výpočtu v sekcii [RA po rokoch](#ra-po-rokoch-rozpustenie-cez-coverage-units)
+- **Grafy**: Jednotky poistného krytia po rokoch, RA BoP po rokoch, NFR komponenty, rozpustenie RA po rokoch, amortizačný faktor po rokoch, RA podľa percentilov (EUR), RA podľa produktov (EUR), heatmapa RA (EUR tis.) produkty × percentily; každý graf obsahuje rozbaľovací popis s informáciou o type, produkte a percentile
 - **Kontrola konzistencie** (OK/CHYBA)
 
 Export:
@@ -96,7 +96,7 @@ Export:
 - **FCF = BEL_base + RA_total** (celkový záväzok podľa IFRS 17)
 
 ### RA po rokoch (rozpustenie cez coverage units)
-- Rozpúšťanie RA je podľa IFRS 17 (odseky 44 a B119) riadené **coverage units** (jednotkami krytia) a **amortizačným faktorom**
+- Rozpúšťanie RA je podľa IFRS 17 (odseky 44 a B119) riadené **coverage units** (jednotkami poistného krytia) a **amortizačným faktorom**
 - **Coverage units (CU)**: poistné sumy vážené podielom preživajúcich zmlúv na začiatku roka: `CU(t) = Σ (sum_insured × S_bop(t))`
 - **Súčasná hodnota coverage units (PV CU)**: budúce CU diskontované **forwardovými sadzbami** – pre `endowment` a `annuity` sa použijú forwardové sadzby z krivky upravenej o prémiu za nelikviditu +0,5 %, pre ostatné produkty štandardná krivka EIOPA: `PV_CU(t) = Σ CU(s) / Π(1 + f(k))` pre s ≥ t
 - **Amortizačný faktor**: `AF(t) = CU(t) / PV_CU(t)` – podiel služby poskytnutej v roku t z celkovej zostávajúcej služby

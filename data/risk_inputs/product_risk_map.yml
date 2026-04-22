@@ -1,13 +1,13 @@
 schema_version: '1.0'
 products:
   term_insurance:
-    sk_name: Poistenie pre prípad smrti
+    sk_name: Dočasné poistenie na úmrtie
     components:
     - mortality
     - lapse
     - expense
   whole_of_life:
-    sk_name: Trvalé životné poistenie
+    sk_name: Doživotné poistenie na úmrtie
     components:
     - mortality
     - lapse

@@ -275,7 +275,7 @@ with st.expander("ℹ️ Vysvetlivky skratiek"):
     - **NFR** (Non-Financial Risk / Nefinančné riziko) – rizikový kapitál pre jednotlivé rizikové komponenty (mortalita, storno, náklady, dlhovekosť)
     - **VaR** (Value at Risk) – štatistická miera rizika na danom percentile spoľahlivosti
     - **FCF** (Fulfillment Cash Flows / Peňažné toky na splnenie záväzkov) – súčet BEL a rizikovej úpravy RA; celkový záväzok poisťovne vykazovaný podľa IFRS 17
-    - **Coverage units** (Jednotky krytia) – miera poistnej služby poskytovanej v danom roku; v tejto aplikácii sa počítajú ako poistné sumy vážené podielom preživajúcich zmlúv
+    - **Coverage units** (Jednotky poistného krytia) – miera poistnej služby poskytovanej v danom roku; v tejto aplikácii sa počítajú ako poistné sumy vážené podielom preživajúcich zmlúv
     - **PV** (Present Value / Súčasná hodnota) – hodnota budúcich peňažných tokov alebo veličín diskontovaná na dnešok pomocou bezrizikovej úrokovej miery
     - **PV CU** (Present Value of Coverage Units) – súčasná hodnota budúcich coverage units diskontovaná forwardovými sadzbami bezrizikovej krivky
     - **BoP** (Beginning of Period / Začiatok obdobia) – hodnota na začiatku roka
@@ -294,10 +294,10 @@ with st.sidebar:
     st.header("Vstupy")
 
     sk_names = {
-        "term_insurance": "Poistenie pre prípad smrti (Term Insurance)",
-        "whole_of_life": "Trvalé životné poistenie (Whole of Life)",
-        "endowment": "Zmiešané poistenie (Endowment)",
-        "annuity": "Dôchodkové poistenie (Annuity)",
+        "term_insurance": "Dočasné poistenie na úmrtie",
+        "whole_of_life": "Doživotné poistenie na úmrtie",
+        "endowment": "Zmiešané poistenie",
+        "annuity": "Dôchodkové poistenie",
     }
 
     sel_type = st.selectbox(
@@ -383,10 +383,10 @@ if st.session_state["do_compute"]:
     c3.metric("Peňažné toky na splnenie záväzkov - FCF (EUR)", _sk_fmt(ra.bel_base + ra.ra_total, 2))
     st.markdown("**NFR komponenty (portfólio)**")
     nfr_names = {
-        "mortality": "Mortalita (Mortality)",
-        "longevity": "Dlhovekosť (Longevity)",
-        "lapse": "Storno (Lapse)",
-        "expense": "Náklady (Expense)",
+        "mortality": "Mortalita",
+        "longevity": "Dlhovekosť",
+        "lapse": "Storno",
+        "expense": "Náklady",
     }
     scr_df = pd.DataFrame([{
         "Komponent": nfr_names.get(k, k),
@@ -469,8 +469,8 @@ if st.session_state["do_compute"]:
     for t in range(max_years):
         rows.append({
             "Rok": t + 1,
-            "Poistná suma – Coverage units (EUR)": cu[t],
-            "PV poistnej sumy – PV CU (EUR)": pv_cu[t],
+            "Jednotky poistného krytia – CU (EUR)": cu[t],
+            "Súčasná hodnota jednotiek poistného krytia – PV CU (EUR)": pv_cu[t],
             "Amortizačný faktor (%)": amort[t] * 100,
             "RA BoP (EUR)": ra_bop[t],
             "Rozpustenie RA (EUR)": ra_release[t],
@@ -481,8 +481,8 @@ if st.session_state["do_compute"]:
 
     st.dataframe(
         ra_schedule_df.style.format({
-            "Poistná suma – Coverage units (EUR)": lambda x: _sk_fmt(x, 0),
-            "PV poistnej sumy – PV CU (EUR)": lambda x: _sk_fmt(x, 0),
+            "Jednotky poistného krytia – CU (EUR)": lambda x: _sk_fmt(x, 0),
+            "Súčasná hodnota jednotiek poistného krytia – PV CU (EUR)": lambda x: _sk_fmt(x, 0),
             "Amortizačný faktor (%)": lambda x: _sk_fmt(x, 2),
             "RA BoP (EUR)": lambda x: _sk_fmt(x, 2),
             "Rozpustenie RA (EUR)": lambda x: _sk_fmt(x, 2),
@@ -554,25 +554,25 @@ if st.session_state["do_compute"]:
         )
         ra_by_p.append((p_val, float(r_p.ra_total)))
 
-    # --- Graf: Poistná suma (Coverage units) po rokoch ---
+    # --- Graf: Jednotky poistného krytia po rokoch ---
     st.markdown("<br>", unsafe_allow_html=True)
     col_g1, col_g2 = st.columns(2)
 
     with col_g1:
         fig1a, ax1a = plt.subplots(figsize=(5, 3))
-        ax1a.plot(ra_schedule_df["Rok"], ra_schedule_df["Poistná suma – Coverage units (EUR)"] / 1e6,
+        ax1a.plot(ra_schedule_df["Rok"], ra_schedule_df["Jednotky poistného krytia – CU (EUR)"] / 1e6,
                     color="#1f77b4", linewidth=2)
         ax1a.set_xlabel("Rok")
         ax1a.set_ylabel("EUR (mil.)")
-        ax1a.set_title("Poistná suma (Coverage units) po rokoch")
+        ax1a.set_title("Jednotky poistného krytia po rokoch")
         ax1a.grid(True, alpha=0.3)
         fig1a.tight_layout()
         st.pyplot(fig1a, use_container_width=True)
-        st.download_button("Stiahnuť graf: Coverage units", _fig_to_download(fig1a),
+        st.download_button("Stiahnuť graf: Coverage poistného units", _fig_to_download(fig1a),
                            file_name="graf_coverage_units.png", mime="image/png", key="dl_graf_coverage_units")
         with st.expander("ℹ️ Popis grafu"):
             st.markdown(
-                f"**Graf:** Poistná suma – Coverage units po rokoch  \n**Produkt:** {sk_names.get(sel_type, sel_type)}  \n**Percentil:** {_sk_fmt(sel_p * 100, 1)}%  \n**Popis:** Vývoj poistných súm vážených podielom preživajúcich zmlúv počas projekčného horizontu portfólia.")
+                f"**Graf:** Poistná suma – Jednotky poistného krytia po rokoch  \n**Produkt:** {sk_names.get(sel_type, sel_type)}  \n**Percentil:** {_sk_fmt(sel_p * 100, 1)}%  \n**Popis:** Vývoj poistných súm vážených podielom preživajúcich zmlúv počas projekčného horizontu portfólia.")
         plt.close(fig1a)
 
     # --- Graf: RA po rokoch ---
@@ -590,24 +590,25 @@ if st.session_state["do_compute"]:
                            file_name="graf_ra_po_rokoch.png", mime="image/png", key="dl_graf_ra_bop_roky")
         with st.expander("ℹ️ Popis grafu"):
             st.markdown(
-                f"**Graf:** RA na začiatku roka (BoP) po rokoch  \n**Produkt:** {sk_names.get(sel_type, sel_type)}  \n**Percentil:** {_sk_fmt(sel_p * 100, 1)}%  \n**Popis:** Zostatok rizikovej úpravy RA na začiatku každého roka po postupnom rozpúšťaní cez coverage units.")
+                f"**Graf:** RA na začiatku roka (BoP) po rokoch  \n**Produkt:** {sk_names.get(sel_type, sel_type)}  \n**Percentil:** {_sk_fmt(sel_p * 100, 1)}%  \n**Popis:** Zostatok rizikovej úpravy RA na začiatku každého roka po postupnom rozpúšťaní cez jednotky poistného krytia.")
         plt.close(fig1b)
 
     st.markdown("<br>", unsafe_allow_html=True)
     st.markdown("<br>", unsafe_allow_html=True)
     # --- Graf: NFR komponenty ---
     nfr_plot = scr_df[scr_df["Komponent"] != "CELKOM (agregované)"].copy()
-    fig2, ax2 = plt.subplots(figsize=(4, 3.5))
+    fig2, ax2 = plt.subplots(figsize=(6, 4.5))
     bars = ax2.bar(nfr_plot["Komponent"], nfr_plot["NFR"] / 1e3,
                    color=["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728"])
     ax2.set_ylabel("EUR (tis.)")
     ax2.set_title("NFR komponenty")
-    ax2.tick_params(axis="x", rotation=15)
+    ax2.tick_params(axis="x", rotation=0)
     ax2.grid(True, axis="y", alpha=0.3)
     for bar in bars:
         val = bar.get_height()
         ax2.text(bar.get_x() + bar.get_width() / 2, val,
                  _sk_fmt(val, 1), ha="center", va="bottom", fontsize=9)
+    fig2.tight_layout()
     st.pyplot(fig2, use_container_width=False)
     st.download_button("Stiahnuť graf: NFR komponenty", _fig_to_download(fig2),
                        file_name="graf_nfr_komponenty.png", mime="image/png")
@@ -653,7 +654,7 @@ if st.session_state["do_compute"]:
                            file_name="graf_amortizacny_faktor.png", mime="image/png", key="dl_graf_amort")
         with st.expander("ℹ️ Popis grafu"):
             st.markdown(
-                f"**Graf:** Amortizačný faktor po rokoch  \n**Produkt:** {sk_names.get(sel_type, sel_type)}  \n**Percentil:** {_sk_fmt(sel_p * 100, 1)}%  \n**Popis:** Pomer coverage units v danom roku k súčasnej hodnote všetkých zostávajúcich coverage units; určuje, aký podiel RA sa v danom roku rozpustí.")
+                f"**Graf:** Amortizačný faktor po rokoch  \n**Produkt:** {sk_names.get(sel_type, sel_type)}  \n**Percentil:** {_sk_fmt(sel_p * 100, 1)}%  \n**Popis:** Pomer jednotiek poistného krytia v danom roku k súčasnej hodnote všetkých zostávajúcich jednotiek poistného krytia; určuje, aký podiel RA sa v danom roku rozpustí.")
         plt.close(fig_af)
 
     st.markdown("<br>", unsafe_allow_html=True)
@@ -767,15 +768,16 @@ if st.session_state["do_compute"]:
             index_stressed=assumptions.index_stressed,
         )
         ra_by_product.append((prod, float(ra_prod.ra_total) / 1e3))
-
-    fig6, ax6 = plt.subplots(figsize=(5.5, 4.5))
-    prod_labels = [sk_names.get(p, p) for p, _ in ra_by_product]
+    prod_labels = [sk_names.get(p, p).replace(" na ", "\nna ") for p, _ in ra_by_product]
     prod_eur = [e for _, e in ra_by_product]
 
-    ax6.bar(prod_labels, prod_eur, color=["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728"])
+    fig6, ax6 = plt.subplots(figsize=(5, 3.5))
+    ax6.bar(range(len(prod_labels)), prod_eur, color=["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728"])
     ax6.set_ylabel("EUR (tis.)")
     ax6.set_title("RA podľa produktov")
-    ax6.tick_params(axis="x", rotation=15)
+    ax6.set_xticks(range(len(prod_labels)))
+    ax6.set_xticklabels(prod_labels, ha="center", rotation=0, fontsize=6)
+    ax6.tick_params(axis="x", pad=3)
     ax6.grid(True, axis="y", alpha=0.3)
     for bar, val in zip(ax6.patches, prod_eur):
         ax6.text(bar.get_x() + bar.get_width() / 2, bar.get_height(),
@@ -944,7 +946,7 @@ if st.session_state["do_compute"]:
 
     ra_schedule_export = ra_schedule_df.copy()
     ra_schedule_export.columns = [
-        "Rok", "Poistná suma – Coverage units (EUR)", "PV poistnej sumy – PV CU (EUR)", "Amortizačný faktor (%)",
+        "Rok", "Jednotky poistného krytia – CU (EUR)", "Súčasná hodnota jednotiek poistného krytia – PV CU (EUR)", "Amortizačný faktor (%)",
         "RA BoP (EUR)", "Rozpustenie RA (EUR)", "RA EoP (EUR)"
     ]
 
